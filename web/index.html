@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Google Drive Ebook Archive</title>
+  <!-- Load Kookit Reader Bundle -->
+  <script src="/kookit/dist/kookit.umd.js"></script>
+  <style>
+    /* Basic, lightweight spinner animation */
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(0,0,0,0.15);
+      border-radius: 50%;
+      border-top-color: #2563eb;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    #loadingOverlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.95);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      font-size: 15px;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <!-- Section 1: Library Explorer View -->
+  <div id="libraryView">
+    <h1>Google Drive Ebook Sync</h1>
+
+    <div>
+      <strong>Drive Connection:</strong> <span id="driveStatus">Checking...</span><br>
+      <strong>Archive Folder:</strong> <span id="folderInfo">Loading...</span><br>
+      <strong>Total Synced:</strong> <span id="syncStats">0 books, 0 folders</span><br>
+      <strong>Last Synced:</strong> <span id="lastSync">Never</span><br>
+      <strong>Local Cache:</strong> <span id="cacheStats">0 books cached</span>
+    </div>
+
+    <p>
+      <button id="syncBtn" onclick="triggerSync()">Sync with Google Drive</button>
+      <button onclick="loadFiles()">Refresh List</button>
+    </p>
+
+    <hr>
+
+    <h3>Location: <span id="breadcrumbs">Archive Root</span></h3>
+
+    <h4>Folders</h4>
+    <ul id="folderList">
+      <li>(No folders)</li>
+    </ul>
+
+    <h4>Books & Files</h4>
+    <ul id="bookList">
+      <li>Loading files...</li>
+    </ul>
+
+    <hr>
+
+    <h4>Logs</h4>
+    <pre id="logBox" style="border: 1px solid #ccc; padding: 10px; min-height: 80px;">[Initialized]</pre>
+  </div>
+
+  <!-- Section 2: Kookit Ebook Reader View -->
+  <div id="readerView" style="display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ccc; padding-bottom: 8px;">
+      <div>
+        <button onclick="closeReader()">⬅ Back to Library</button>
+        <strong id="readerBookTitle" style="margin-left: 10px; font-size: 16px;">Reading Book</strong>
+        <span id="readerBookFormat" style="margin-left: 6px; color: #666; font-size: 13px;">[EPUB]</span>
+      </div>
+      <div>
+        <label>Chapters: </label>
+        <select id="chapterSelect" onchange="jumpToChapter(this.value)">
+          <option value="">Table of Contents</option>
+        </select>
+        &nbsp;|&nbsp;
+        <label>Mode: </label>
+        <select id="modeSelect" onchange="changeReaderMode(this.value)">
+          <option value="single">Single Page</option>
+          <option value="scroll">Scroll</option>
+          <option value="double">Double Page</option>
+        </select>
+        &nbsp;|&nbsp;
+        <button onclick="prevPage()">⏮ Prev</button>
+        <button onclick="nextPage()">Next ⏭</button>
+      </div>
+    </div>
+
+    <div id="readerStatus" style="font-size: 12px; color: #666; margin: 6px 0;">Ready</div>
+
+    <!-- Reader Frame Container with Loading Overlay -->
+    <div style="position: relative; width: 100%; height: 80vh; border: 1px solid #ccc; background: #ffffff; margin-top: 6px;">
+      <!-- Loading Overlay with Spinner -->
+      <div id="loadingOverlay" style="display: none;">
+        <div style="display: flex; align-items: center; margin-bottom: 8px;">
+          <div class="spinner"></div>
+          <strong id="loadingTitle">Initializing Kookit...</strong>
+        </div>
+        <div id="loadingDetail" style="font-size: 13px; color: #666;">Downloading and preparing book rendition...</div>
+      </div>
+
+      <!-- Kookit Iframe Container (id MUST be page-area for Kookit) -->
+      <div id="page-area" style="width: 100%; height: 100%; position: relative; overflow: hidden;"></div>
+    </div>
+  </div>
+
+  <script>
+    let currentFolderId = null;
+    let currentRendition = null;
+    let currentBookData = null;
+    let currentReaderMode = 'single';
+
+    function log(msg) {
+      const box = document.getElementById('logBox');
+      const time = new Date().toLocaleTimeString();
+      box.textContent = `[${time}] ${msg}\n` + box.textContent;
+    }
+
+    function showLoading(title, detail = '') {
+      const overlay = document.getElementById('loadingOverlay');
+      const titleEl = document.getElementById('loadingTitle');
+      const detailEl = document.getElementById('loadingDetail');
+      if (overlay) overlay.style.display = 'flex';
+      if (titleEl) titleEl.textContent = title;
+      if (detailEl) detailEl.textContent = detail;
+    }
+
+    function hideLoading() {
+      const overlay = document.getElementById('loadingOverlay');
+      if (overlay) overlay.style.display = 'none';
+    }
+
+    // 1. System & Connection Status
+    async function loadStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        if (data.success) {
+          const s = data.data;
+          document.getElementById('driveStatus').textContent = s.connected
+            ? (s.keyDetected ? 'Connected (Key detected)' : 'Connected (No key found)')
+            : 'Disconnected';
+
+          const rootName = s.rootFolder.name || 'Archive Folder';
+          const rootId = s.rootFolder.id || 'N/A';
+          const access = s.rootFolder.accessible ? 'Accessible' : (s.rootFolder.error || 'Pending');
+          document.getElementById('folderInfo').textContent = `${rootName} (${rootId}) - ${access}`;
+
+          document.getElementById('syncStats').textContent = `${s.stats.totalBooks} books (${s.stats.totalSizeFormatted}), ${s.stats.totalFolders} folders`;
+          document.getElementById('lastSync').textContent = s.lastSyncTime ? new Date(s.lastSyncTime).toLocaleString() : 'Never';
+          document.getElementById('cacheStats').textContent = `${s.cacheStats.count} books cached (${s.cacheStats.totalBytesFormatted})`;
+        } else {
+          log('Status error: ' + data.error);
+        }
+      } catch (err) {
+        log('Connection error: ' + err.message);
+      }
+    }
+
+    // 2. Load Folder Files
+    async function loadFiles(folderId = currentFolderId) {
+      try {
+        const url = folderId ? `/api/files?folderId=${encodeURIComponent(folderId)}` : '/api/files';
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (!data.success) {
+          log('Error loading files: ' + data.error);
+          return;
+        }
+
+        currentFolderId = data.data.currentFolder?.id || null;
+        renderBreadcrumbs(data.data.breadcrumbs);
+        renderLists(data.data.folders, data.data.books);
+      } catch (err) {
+        log('Error: ' + err.message);
+      }
+    }
+
+    function renderBreadcrumbs(crumbs = []) {
+      const el = document.getElementById('breadcrumbs');
+      if (!crumbs || crumbs.length === 0) {
+        el.textContent = 'Archive Root';
+        return;
+      }
+      el.innerHTML = crumbs.map((c, i) => {
+        if (i === crumbs.length - 1) return `<strong>${c.name}</strong>`;
+        return `<a href="#" onclick="loadFiles('${c.id}'); return false;">${c.name}</a> / `;
+      }).join('');
+    }
+
+    function renderLists(folders = [], books = []) {
+      const folderList = document.getElementById('folderList');
+      const bookList = document.getElementById('bookList');
+
+      folderList.innerHTML = '';
+      bookList.innerHTML = '';
+
+      if (folders.length === 0) {
+        folderList.innerHTML = '<li>(No subfolders)</li>';
+      } else {
+        folders.forEach(f => {
+          const li = document.createElement('li');
+          li.innerHTML = `📁 <a href="#" onclick="loadFiles('${f.id}'); return false;"><strong>${f.name}</strong></a>`;
+          folderList.appendChild(li);
+        });
+      }
+
+      if (books.length === 0) {
+        bookList.innerHTML = '<li>(No books in this folder)</li>';
+      } else {
+        books.forEach(b => {
+          const li = document.createElement('li');
+          const cacheText = b.cached ? `[Cached: ${b.cachedSizeFormatted}]` : '[Cloud Only]';
+          li.innerHTML = `
+            📄 [${b.format}] <strong>${b.name}</strong> - ${b.sizeFormatted || '0 B'} - <em>${cacheText}</em>
+            <button onclick="readBook('${b.id}', '${escapeQuotes(b.name)}', '${b.format}')">📖 Read (Kookit)</button>
+            ${b.cached ? `<button onclick="deleteCache('${b.id}')">Delete Cache</button>` : ''}
+          `;
+          bookList.appendChild(li);
+        });
+      }
+    }
+
+    function escapeQuotes(str) {
+      return (str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    }
+
+    // 3. Manual Sync
+    async function triggerSync() {
+      const btn = document.getElementById('syncBtn');
+      btn.disabled = true;
+      btn.textContent = 'Syncing...';
+      log('Starting Google Drive sync...');
+
+      try {
+        const res = await fetch('/api/sync', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          log(`Sync complete in ${data.data.durationMs}ms: ${data.data.stats.totalBooks} books, ${data.data.stats.totalFolders} folders.`);
+          if (data.data.diff) {
+            log(`Diff: +${data.data.diff.newBooksCount} new books, -${data.data.diff.removedBooksCount} removed books.`);
+          }
+        } else {
+          log('Sync failed: ' + data.error);
+        }
+      } catch (err) {
+        log('Sync error: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Sync with Google Drive';
+        await loadStatus();
+        await loadFiles(currentFolderId);
+      }
+    }
+
+    // 4. Read / Cache Book with Kookit Integration
+    async function readBook(fileId, bookName, bookFormat = 'EPUB') {
+      log(`Opening book: "${bookName}" (${fileId})...`);
+      document.getElementById('libraryView').style.display = 'none';
+      document.getElementById('readerView').style.display = 'block';
+
+      document.getElementById('readerBookTitle').textContent = bookName;
+      document.getElementById('readerBookFormat').textContent = `[${bookFormat}]`;
+      
+      const pageArea = document.getElementById('page-area');
+      pageArea.innerHTML = '';
+
+      // Show initial loading icon overlay
+      showLoading('Fetching book data...', 'Downloading / verifying local cache...');
+
+      try {
+        const startTime = Date.now();
+        const res = await fetch(`/api/book/${fileId}/stream`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+
+        const source = res.headers.get('X-Cache-Source') || 'stream';
+        const buffer = await res.arrayBuffer();
+        const fetchDuration = Date.now() - startTime;
+        log(`Book retrieved (${source}) in ${fetchDuration}ms (${(buffer.byteLength / 1024 / 1024).toFixed(2)} MB).`);
+
+        currentBookData = {
+          fileId,
+          name: bookName,
+          format: bookFormat,
+          buffer
+        };
+
+        showLoading('Initializing Kookit engine...', `Parsing ${bookFormat} metadata and structure...`);
+
+        if (!window.Kookit) {
+          throw new Error('Kookit library is not loaded.');
+        }
+
+        window.transMap = window.transMap || {};
+
+        const config = {
+          format: bookFormat.toUpperCase(),
+          readerMode: currentReaderMode,
+          animation: 'none',
+          charset: 'utf-8',
+          isDarkMode: 'no',
+          convertChinese: 'no',
+          isConvertPDF: 'no',
+          isMobile: 'no',
+          backgroundColor: '#ffffff'
+        };
+
+        // Create Rendition instance
+        let rendition = null;
+        if (window.Kookit.BookHelper && typeof window.Kookit.BookHelper.getRendition === 'function') {
+          rendition = window.Kookit.BookHelper.getRendition(buffer, config, window.Kookit);
+        } else {
+          const fmt = bookFormat.toUpperCase();
+          if (fmt === 'EPUB' && window.Kookit.EpubRender) {
+            rendition = new window.Kookit.EpubRender(buffer, config);
+          } else if ((fmt === 'MOBI' || fmt === 'AZW3' || fmt === 'AZW') && window.Kookit.MobiRender) {
+            rendition = new window.Kookit.MobiRender(buffer, config);
+          } else if (fmt === 'PDF' && window.Kookit.PdfRender) {
+            rendition = new window.Kookit.PdfRender(buffer, config);
+          } else if (fmt === 'TXT' && window.Kookit.TxtRender) {
+            rendition = new window.Kookit.TxtRender(buffer, config);
+          } else if (fmt === 'MD' && window.Kookit.MdRender) {
+            rendition = new window.Kookit.MdRender(buffer, config);
+          }
+        }
+
+        if (!rendition) {
+          throw new Error(`No compatible Kookit renderer for format: ${bookFormat}`);
+        }
+
+        currentRendition = rendition;
+        window.rendition = rendition;
+
+        showLoading('Rendering chapter...', 'Injecting iframe layout and styles...');
+
+        // 1. Render layout to container
+        await rendition.renderTo(pageArea);
+
+        // 2. Display the first chapter immediately
+        if (rendition.chapterDocList && rendition.chapterDocList.length > 0) {
+          await rendition.goToChapterDocIndex(0);
+        } else if (typeof rendition.goToChapter === 'function') {
+          await rendition.goToChapter(0);
+        }
+
+        // 3. Populate Table of Contents
+        await populateChapters(rendition);
+
+        // 4. Update status events
+        const statusEl = document.getElementById('readerStatus');
+        statusEl.textContent = 'Book loaded and ready.';
+
+        if (rendition.on) {
+          rendition.on('rendered', () => {
+            statusEl.textContent = 'Page rendered.';
+          });
+          rendition.on('page-changed', async () => {
+            if (typeof rendition.getPosition === 'function') {
+              const pos = rendition.getPosition();
+              statusEl.textContent = `Chapter ${pos?.chapterDocIndex ?? 0}`;
+            }
+          });
+        }
+
+        // 5. Hide loading overlay now that the book is fully visible
+        hideLoading();
+        const totalDuration = Date.now() - startTime;
+        log(`Book "${bookName}" ready in ${totalDuration}ms.`);
+      } catch (err) {
+        log(`Error reading with Kookit: ${err.message}`);
+        showLoading('Failed to open book', err.message);
+        setTimeout(hideLoading, 4000);
+      }
+    }
+
+    async function populateChapters(rendition) {
+      const chapterSelect = document.getElementById('chapterSelect');
+      chapterSelect.innerHTML = '<option value="">Table of Contents</option>';
+
+      try {
+        let chapters = [];
+        if (typeof rendition.getChapter === 'function') {
+          chapters = await rendition.getChapter() || [];
+        } else if (rendition.chapterList) {
+          chapters = rendition.chapterList;
+        }
+
+        if (chapters && chapters.length > 0) {
+          chapters.forEach((ch, idx) => {
+            const opt = document.createElement('option');
+            opt.value = ch.index !== undefined ? ch.index : idx;
+            opt.textContent = ch.label || `Chapter ${idx + 1}`;
+            chapterSelect.appendChild(opt);
+          });
+        }
+      } catch (e) {
+        console.warn('Could not populate chapters:', e);
+      }
+    }
+
+    function jumpToChapter(index) {
+      if (!currentRendition || index === '') return;
+      if (typeof currentRendition.goToChapter === 'function') {
+        currentRendition.goToChapter(parseInt(index, 10));
+      }
+    }
+
+    function nextPage() {
+      if (currentRendition && typeof currentRendition.next === 'function') {
+        currentRendition.next();
+      }
+    }
+
+    function prevPage() {
+      if (currentRendition && typeof currentRendition.prev === 'function') {
+        currentRendition.prev();
+      }
+    }
+
+    function changeReaderMode(mode) {
+      currentReaderMode = mode;
+      if (currentBookData) {
+        readBook(currentBookData.fileId, currentBookData.name, currentBookData.format);
+      }
+    }
+
+    function closeReader() {
+      document.getElementById('readerView').style.display = 'none';
+      document.getElementById('libraryView').style.display = 'block';
+      const pageArea = document.getElementById('page-area');
+      if (pageArea) pageArea.innerHTML = '';
+      currentRendition = null;
+      hideLoading();
+      loadStatus();
+      loadFiles(currentFolderId);
+    }
+
+    // Keyboard navigation (Left / Right arrow keys)
+    window.addEventListener('keydown', (e) => {
+      if (document.getElementById('readerView').style.display !== 'none') {
+        if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+          nextPage();
+        } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+          prevPage();
+        } else if (e.key === 'Escape') {
+          closeReader();
+        }
+      }
+    });
+
+    // 5. Cache Management
+    async function deleteCache(fileId) {
+      try {
+        const res = await fetch(`/api/book/${fileId}/cache`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+          log(`Cache cleared for ${fileId}`);
+          await loadStatus();
+          await loadFiles(currentFolderId);
+        }
+      } catch (err) {
+        log('Error deleting cache: ' + err.message);
+      }
+    }
+
+    // Initialize on page load
+    loadStatus();
+    loadFiles();
+  </script>
+</body>
+</html>

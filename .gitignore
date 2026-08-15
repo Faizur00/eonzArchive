@@ -1,2 +1,11 @@
-eonzarchive-ee839564c0f3.json
+node_modules/
 .env
+*.json
+!.package.json
+!package.json
+!tsconfig.json
+!kookit/**
+.cache/
+data/cache/
+data/library.json
+.DS_Store

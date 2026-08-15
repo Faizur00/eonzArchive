@@ -6,12 +6,10 @@ import json from "@rollup/plugin-json";
 import { babel } from "@rollup/plugin-babel";
 import path from "path";
 const getDesktopOutputPath = (filename) => {
-  const basePath = "D:\\Project\\koodo-reader";
-  return path.join(basePath, "src", "assets", "lib", filename);
+  return path.join(__dirname, "dist", filename);
 };
 const getMobileOutputPath = (filename) => {
-  const basePath = "D:\\Project\\koodo-reader-expo";
-  return path.join(basePath, "assets", "lib", filename);
+  return path.join(__dirname, "dist", filename);
 };
 export default [
   {
