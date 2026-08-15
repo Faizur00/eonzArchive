@@ -8,4 +8,6 @@ node_modules/
 .cache/
 data/cache/
 data/library.json
+web/lib/pdfjs/cmaps/
+web/lib/pdfjs/standard_fonts/
 .DS_Store

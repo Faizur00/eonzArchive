@@ -3,8 +3,20 @@
 <head>
   <meta charset="utf-8">
   <title>Google Drive Ebook Archive</title>
-  <!-- Load Kookit Reader Bundle -->
-  <script src="/kookit/dist/kookit.umd.js"></script>
+  <!-- Load pdf.js first, then inject the Kookit UMD bundle.
+       Kookit's PDF renderer reads window.pdfjsLib at bundle-eval time,
+       so pdf.js must be present before the classic script runs. -->
+  <script type="module">
+    await import("/lib/pdfjs/pdf.mjs");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "/lib/pdfjs/pdf.worker.mjs";
+    window.__kookitReady = new Promise((resolve) => {
+      const s = document.createElement("script");
+      s.src = "/kookit/dist/kookit.umd.js";
+      s.onload = () => resolve(window.Kookit);
+      s.onerror = () => resolve(null);
+      document.head.appendChild(s);
+    });
+  </script>
   <style>
     /* Basic, lightweight spinner animation */
     .spinner {
@@ -272,6 +284,7 @@
 
     // 4. Read / Cache Book with Kookit Integration
     async function readBook(fileId, bookName, bookFormat = 'EPUB') {
+      if (window.__kookitReady) await window.__kookitReady;
       log(`Opening book: "${bookName}" (${fileId})...`);
       document.getElementById('libraryView').style.display = 'none';
       document.getElementById('readerView').style.display = 'block';
