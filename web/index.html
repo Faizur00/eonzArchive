@@ -17,6 +17,25 @@
       document.head.appendChild(s);
     });
   </script>
+  <script>
+    // Attach the API token (embedded by the server) to every same-origin /api request.
+    // The server rejects /api calls without a matching X-Request-Token header.
+    // The token is read at call time because the server injects it later in <head>.
+    (function () {
+      const nativeFetch = window.fetch.bind(window);
+      window.fetch = function (input, init) {
+        const token = window.__API_TOKEN || '';
+        const url = typeof input === 'string' ? input : (input && input.url);
+        if (token && typeof url === 'string' && url.startsWith('/api/')) {
+          init = init || {};
+          const headers = new Headers(init.headers || {});
+          headers.set('X-Request-Token', token);
+          init.headers = headers;
+        }
+        return nativeFetch(input, init);
+      };
+    })();
+  </script>
   <style>
     /* Basic, lightweight spinner animation */
     .spinner {

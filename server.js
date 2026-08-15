@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
+const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 
@@ -9,17 +9,61 @@ const DriveService = require('./src/services/driveService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '127.0.0.1';
 const PROJECT_ROOT = __dirname;
 
-app.use(cors());
+// Per-process secret required on every /api request via the X-Request-Token header.
+// The server embeds the token into the served index.html so the same-origin UI can send it.
+// A cross-origin page cannot read the HTML (no CORS) and cannot attach the header without a
+// preflight (which the server rejects), so this blocks both data exfiltration and CSRF.
+const API_TOKEN = process.env.API_TOKEN || crypto.randomBytes(32).toString('hex');
+
+// Host allowlist defeats DNS-rebinding attacks. Defaults to loopback aliases; extend via ALLOWED_HOSTS.
+const allowedHosts = new Set(
+  ['localhost', '127.0.0.1', '[::1]']
+    .concat((process.env.ALLOWED_HOSTS || '').split(',').map(h => h.trim()).filter(Boolean))
+);
+
 app.use(express.json());
+
+// Reject requests whose Host header is not allowed.
+app.use((req, res, next) => {
+  const hostRaw = String(req.headers.host || '').toLowerCase();
+  const host = hostRaw.startsWith('[')
+    ? hostRaw.slice(0, hostRaw.indexOf(']') + 1)
+    : hostRaw.split(':')[0];
+  if (!allowedHosts.has(host)) {
+    return res.status(403).json({ success: false, error: 'Forbidden host' });
+  }
+  next();
+});
+
+// Require the request token on all API calls.
+app.use('/api', (req, res, next) => {
+  const token = req.headers['x-request-token'];
+  if (typeof token !== 'string' || token !== API_TOKEN) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+  next();
+});
 
 // Initialize Services
 const cacheService = new CacheService(PROJECT_ROOT);
 const driveService = new DriveService(PROJECT_ROOT, cacheService);
 
-// Serve static frontend from web/
-app.use(express.static(path.join(__dirname, 'web')));
+// Serve the SPA shell with the API token embedded for the same-origin frontend.
+function serveApp(req, res) {
+  const html = fs.readFileSync(path.join(__dirname, 'web', 'index.html'), 'utf8');
+  res.type('html').send(
+    html.replace('</head>', `<script>window.__API_TOKEN = ${JSON.stringify(API_TOKEN)};</script></head>`)
+  );
+}
+
+app.get('/', serveApp);
+app.get('/index.html', serveApp);
+
+// Serve static frontend from web/ (index.html is handled by serveApp so the token is embedded)
+app.use(express.static(path.join(__dirname, 'web'), { index: false }));
 
 // Serve kookit library assets if needed
 app.use('/kookit', express.static(path.join(__dirname, 'kookit')));
@@ -225,14 +269,12 @@ app.get('/api/book/:id/stream', async (req, res) => {
   }
 });
 
-// Fallback to index.html for SPA routing
-app.use((req, res) => {
-  res.sendFile(path.join(__dirname, 'web', 'index.html'));
-});
+// Fallback to the SPA shell (with embedded API token) for any unmatched route
+app.use(serveApp);
 
 // Start Server
-app.listen(PORT, async () => {
-  console.log(`🚀 Personal Ebook Archive Server running at http://localhost:${PORT}`);
+app.listen(PORT, HOST, async () => {
+  console.log(`🚀 Personal Ebook Archive Server running at http://${HOST}:${PORT}`);
   console.log(`📖 Web UI accessible at http://localhost:${PORT}`);
 
   // Perform an initial background sync if library is empty
