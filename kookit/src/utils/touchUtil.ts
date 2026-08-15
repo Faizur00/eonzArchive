@@ -1,0 +1,1132 @@
+import rangy from "rangy/lib/rangy-core.js";
+import { createSelectionAutoTurn } from "./selectionAutoTurn";
+
+declare var window: any;
+let selectionTimeout: any = null;
+let isDragging = false;
+export const slideAnimateTo = (
+  direction: string,
+  format: string,
+  doc: any,
+  outerDoc: any,
+  element: any,
+  render: any,
+  gap: number
+) => {
+  let pageWidth = element.clientWidth + gap;
+  let tempDoc = format === "PDF" ? outerDoc : doc;
+
+  // Stop any ongoing touch-move dragging immediately so onTouchMove
+  // no longer modifies scrollLeft while the animation is running.
+  isDragging = false;
+
+  // Clean up any existing animation
+  if (window.scrollAnimationId) {
+    cancelAnimationFrame(window.scrollAnimationId);
+  }
+
+  if (
+    Math.abs(
+      tempDoc.body.scrollWidth - tempDoc.body.scrollLeft - element.clientWidth
+    ) < 10 &&
+    direction === "right"
+  ) {
+    render.next();
+    return;
+  }
+  if (tempDoc.body.scrollLeft === 0 && direction === "left") {
+    render.prev();
+    return;
+  }
+
+  let scrollLeft = tempDoc.body.scrollLeft;
+
+  // Improved snapping logic
+  let snapX;
+  const currentPage = Math.round(scrollLeft / pageWidth);
+
+  if (direction === "left") {
+    snapX = (currentPage - 1) * pageWidth;
+  } else if (direction === "right") {
+    snapX = (currentPage + 1) * pageWidth;
+  } else {
+    snapX = currentPage * pageWidth;
+  }
+
+  // Clamp to valid range. For the last page the body may not be an exact
+  // multiple of pageWidth, so if the remaining content after snapX is less
+  // than a full page we snap all the way to the end in one step.
+  const maxScroll = tempDoc.body.scrollWidth - element.clientWidth;
+  if (
+    snapX >= maxScroll ||
+    tempDoc.body.scrollWidth - snapX < pageWidth + gap
+  ) {
+    snapX = maxScroll;
+  }
+  snapX = Math.max(0, snapX);
+
+  const startLeft = tempDoc.body.scrollLeft;
+  const distance = snapX - startLeft;
+  const duration = 250; // 缩短动画时间，减少卡顿感
+
+  const body = tempDoc.body;
+  const startTime = performance.now();
+  window.isSwiping = true;
+
+  // 更激进的硬件加速设置
+  body.style.willChange = "transform";
+  body.style.transform = "translateZ(0)";
+  body.style.backfaceVisibility = "hidden";
+
+  // 使用线性缓动，计算最简单，性能最好
+  const easeOutQuad = (t: number): number => t * (2 - t);
+
+  // 预先缓存 transform 字符串的前缀，减少字符串拼接
+  const transformPrefix = "translate3d(";
+  const transformSuffix = "px, 0, 0)";
+
+  function animateScroll(currentTime: number) {
+    const elapsed = currentTime - startTime;
+    const progress = elapsed / duration;
+
+    if (progress >= 1) {
+      // 动画完成，清理并设置最终位置
+      body.style.transform = "";
+      body.style.willChange = "";
+      body.style.backfaceVisibility = "";
+      body.scrollLeft = snapX;
+
+      render.record();
+      isDragging = false;
+      window.isSwiping = false;
+      return;
+    }
+
+    // 使用更轻量的缓动函数
+    const easedProgress = easeOutQuad(progress);
+    const currentOffset = startLeft + distance * easedProgress;
+    const translateX = startLeft - currentOffset;
+
+    // 使用 | 0 进行快速取整，比 Math.round 更快
+    body.style.transform = transformPrefix + (translateX | 0) + transformSuffix;
+
+    window.scrollAnimationId = requestAnimationFrame(animateScroll);
+  }
+
+  window.scrollAnimationId = requestAnimationFrame(animateScroll);
+};
+export async function blobUrlToBase64(blobUrl: string): Promise<string> {
+  try {
+    // 1. 获取Blob数据
+    const response = await fetch(blobUrl);
+    const blob = await response.blob();
+
+    // 2. 将Blob转换为Base64
+    const base64: string = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string); // 成功时返回Base64字符串
+      reader.onerror = reject; // 失败时拒绝Promise
+      reader.readAsDataURL(blob); // 开始读取
+    });
+
+    return base64; // 返回形如 "data:image/png;base64,..." 的字符串
+  } catch (error) {
+    console.error("转换失败:", error);
+    throw error; // 抛出错误
+  }
+}
+function getScreenLeftOffset() {
+  if (window.visualViewport) {
+    return window.visualViewport.offsetLeft;
+  } else {
+    // 回退到滚动偏移量，注意可能不准确
+    return window.pageXOffset || document.documentElement.scrollLeft || 0;
+  }
+}
+function getScreenTopOffset() {
+  if (window.visualViewport) {
+    return window.visualViewport.offsetTop;
+  } else {
+    // 回退到滚动偏移量，注意可能不准确
+    return window.pageYOffset || document.documentElement.scrollTop || 0;
+  }
+}
+const preventLinkNavigation = async (event: any, doc: any, render: any) => {
+  const target = event.target;
+  if (!target) return;
+  event.preventDefault();
+  event.stopPropagation();
+  let href = render.getTargetHref(event);
+  let result = await render.handleLinkJump(href, event);
+  if (!result.handled) {
+    return false;
+  }
+  if (result.external) {
+    window.ReactNativeWebView.postMessage(
+      JSON.stringify({
+        event: "link-clicked",
+        href: href,
+        footnote: "",
+        ...result,
+      })
+    );
+    return true;
+  }
+  let footnoteResult = await render.getFootnoteContent(result.node);
+  window.ReactNativeWebView.postMessage(
+    JSON.stringify({
+      event: "link-clicked",
+      href: href,
+      footnote: !footnoteResult.handled ? "" : footnoteResult.content,
+      rect: event.target.getBoundingClientRect(),
+      ...result,
+    })
+  );
+  return true;
+};
+function findLinkElement(element) {
+  // Check if the element itself is a link
+  if (element.tagName === "A") {
+    return element;
+  }
+
+  // Traverse up the DOM tree to check for parent links
+  // This handles cases where the click target is a child element inside a link
+  let currentElement = element;
+  while (currentElement && currentElement.tagName !== "BODY") {
+    if (currentElement.tagName === "A") {
+      return currentElement;
+    }
+    currentElement = currentElement.parentElement;
+  }
+
+  return null;
+}
+function getTouchAction(col: number, row: number, touchControlRule: any) {
+  //根据col和row获取对应的区域编号，从左到右，从上到下，1-9
+  const areaIndex = row * 3 + col + 1; // 1-9
+  //如果区域编号在touchControlRule中存在，则返回对应的action
+  if (touchControlRule.layout["A"].area.includes(areaIndex)) {
+    return touchControlRule["touchControlA"];
+  } else if (touchControlRule.layout["B"].area.includes(areaIndex)) {
+    return touchControlRule["touchControlB"];
+  } else if (touchControlRule.layout["C"].area.includes(areaIndex)) {
+    return touchControlRule["touchControlC"];
+  }
+  return "right";
+}
+const getSelectionSentence = (doc: any): string => {
+  let sel = doc.getSelection();
+  if (!sel || !sel.toString().trim()) return "";
+  try {
+    let range = sel.getRangeAt(0);
+    let container = range.commonAncestorContainer;
+    // Walk up to a text-containing element
+    let el: Node | null =
+      container.nodeType === Node.TEXT_NODE
+        ? container.parentElement
+        : container;
+    let fullText = (el as Element)?.textContent || "";
+    let selectedText = sel.toString().trim();
+    // Split after sentence-ending punctuation (avoid lookbehind for old WebViews)
+    let sentences =
+      fullText
+        .match(/[^.!?。！？]*[.!?。！？]?/g)
+        ?.filter((s) => s.length > 0) ?? [];
+    for (let s of sentences) {
+      if (s.includes(selectedText)) {
+        return s.trim();
+      }
+    }
+    // Fallback: return the whole text content of the container
+    return fullText.trim().substring(0, 200); // Limit to 200 chars to avoid huge messages
+  } catch {
+    // ignore
+  }
+
+  return "";
+};
+export const addAndroidTouchEvent = (
+  doc: Document,
+  iframe: any,
+  element: HTMLElement,
+  readerMode: string,
+  animation: string,
+  format: string,
+  touchControlRule: any,
+  render: any
+) => {
+  let iWin: any = iframe.contentWindow || iframe.contentDocument?.defaultView;
+  let outerDoc: any = render.getDocument();
+  let touchStartTime = 0;
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let lastTouchEnd = 0;
+  const swipeThreshold = 30; // Minimum distance in pixels to be considered a swipe
+  const timeThreshold = 500; // Maximum time in milliseconds to be considered a tap
+  let section = Math.floor(element.clientWidth / 12);
+  let gap = section % 2 === 0 ? section : section - 1;
+  let pageWidth = element.clientWidth + gap;
+  const selectionAutoTurn = createSelectionAutoTurn({
+    element,
+    iframe,
+    doc,
+    render,
+    readerMode,
+    format,
+    enableScrollPin: true,
+  });
+  let onTouchEnd = function (event) {
+    window.isSwiping = false;
+
+    let now = new Date().getTime();
+    if (now - lastTouchEnd <= 300) {
+      event.preventDefault();
+      return;
+    }
+    lastTouchEnd = now;
+    const touch = event.changedTouches[0];
+    const touchEndTime = Date.now();
+    let touchEndX = touch.screenX;
+    let touchEndY = touch.screenY;
+
+    const timeDiff = touchEndTime - touchStartTime;
+    const distX = touchEndX - touchStartX;
+    const distY = touchEndY - touchStartY;
+    // 墨水屏模式下的animation为none，需要关闭动画
+    if (
+      isDragging &&
+      (animation === "mimical" || animation === "none") &&
+      readerMode !== "scroll"
+    ) {
+      isDragging = false;
+      render.mouseUpHandler(event);
+      if (
+        touch.screenX < (window.innerWidth / 4) * 3 &&
+        touchEndX - touchStartX < 0
+      ) {
+        render.next();
+        isDragging = false;
+      } else if (
+        touch.screenX > (window.innerWidth / 4) * 1 &&
+        touchEndX - touchStartX > 0
+      ) {
+        render.prev();
+        isDragging = false;
+      }
+      setTimeout(() => {
+        let bookDiv = document.getElementById("book");
+        if (bookDiv) {
+          bookDiv.style.display = "none";
+        }
+      }, 400);
+
+      return;
+    }
+    // Replace the scrollTo implementation with this optimized version
+
+    if (isDragging && animation === "sliding" && readerMode !== "scroll") {
+      const dragPercentage = Math.abs(distX) / window.innerWidth;
+      const dragThreshold = 0.1; // Only 10% drag needed to change page
+
+      if (distX > 0 && dragPercentage > dragThreshold) {
+        // Dragged right (go to previous page)
+        slideAnimateTo("left", format, doc, outerDoc, element, render, gap);
+      } else if (distX < 0 && dragPercentage > dragThreshold) {
+        // Dragged left (go to next page)
+        slideAnimateTo("right", format, doc, outerDoc, element, render, gap);
+      } else {
+        // Stay on current page
+        slideAnimateTo("stay", format, doc, outerDoc, element, render, gap);
+      }
+
+      return;
+    }
+    var selectedText = iWin.getSelection().toString();
+    var isSwiping =
+      Math.abs(distX) >= swipeThreshold || Math.abs(distY) >= swipeThreshold;
+    if (
+      selectedText &&
+      (format !== "PDF" || (format === "PDF" && !isSwiping))
+    ) {
+      window.ReactNativeWebView.postMessage(
+        JSON.stringify({
+          event: "select-text-after-touch",
+          selectedText: selectedText,
+        })
+      );
+      return;
+    }
+    if (!selectedText) {
+      selectionAutoTurn?.onSelectionCleared();
+    }
+    if (timeDiff > timeThreshold) {
+      const target: any = event.target;
+      if (!target) return;
+      let linkElement = findLinkElement(target);
+      if (linkElement) {
+        return;
+      }
+      if (target.tagName === "IMG" || target.tagName === "image") {
+        const imgSrc = target.src || target.getAttribute("xlink:href");
+        //blob to base64
+        if (imgSrc.startsWith("blob:")) {
+          blobUrlToBase64(imgSrc).then((base64) => {
+            window.ReactNativeWebView.postMessage(
+              JSON.stringify({ event: "view-image", imgSrc: base64 })
+            );
+          });
+        }
+        return;
+      }
+    }
+    if (
+      timeDiff < timeThreshold &&
+      Math.abs(distX) < swipeThreshold &&
+      Math.abs(distY) < swipeThreshold
+    ) {
+      var width = window.innerWidth;
+      var height = window.innerHeight;
+
+      var cellWidth = width / 3;
+      var cellHeight = height / 3;
+      var col = Math.floor(touchEndX / cellWidth);
+      var row = Math.floor(touchEndY / cellHeight);
+      var result = getTouchAction(col, row, touchControlRule);
+      if (animation === "sliding" && readerMode !== "scroll") {
+        if (result === "right") {
+          slideAnimateTo("right", format, doc, outerDoc, element, render, gap);
+          return;
+        } else if (result === "left") {
+          slideAnimateTo("left", format, doc, outerDoc, element, render, gap);
+          return;
+        }
+      }
+      window.ReactNativeWebView.postMessage(JSON.stringify({ event: result }));
+    } else if (
+      Math.abs(distX) >= swipeThreshold ||
+      Math.abs(distY) >= swipeThreshold
+    ) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ event: "swipe" }));
+      if (
+        readerMode === "scroll" &&
+        Math.abs(
+          element.scrollHeight - element.scrollTop - element.clientHeight
+        ) < 10
+      ) {
+        window.ReactNativeWebView.postMessage(
+          JSON.stringify({ event: "scroll-bottom" })
+        );
+      }
+      if (readerMode === "scroll" && element.scrollTop === 0) {
+        window.ReactNativeWebView.postMessage(
+          JSON.stringify({ event: "scroll-top" })
+        );
+      }
+    }
+  };
+  let onTouchStart = function (event) {
+    touchStartTime = Date.now();
+    const target = event.target;
+    if (!target) return;
+
+    const linkElement = findLinkElement(target);
+    if (linkElement) {
+      return;
+    }
+
+    if (event.touches.length > 1) {
+      event.preventDefault();
+    }
+    const touch = event.touches[0];
+
+    touchStartX = touch.screenX;
+    touchStartY = touch.screenY;
+  };
+
+  let lastTouchX = 0;
+
+  let onTouchMove = function (event) {
+    const selectedText = iWin.getSelection().toString().trim();
+    if (selectedText) {
+      const touch = event.touches[0];
+      selectionAutoTurn?.onTouchMove(touch.clientX, touch.clientY);
+      return;
+    }
+
+    // Skip handling if not dragging yet and still determining direction
+    if (!isDragging && Math.abs(event.touches[0].screenX - touchStartX) <= 10) {
+      return;
+    }
+
+    // Prevent default to stop browser scroll behavior
+    event.preventDefault();
+    if (window.visualViewport.scale > 1 && format === "PDF") {
+      event.preventDefault();
+      return;
+    }
+    const touch = event.touches[0];
+    const touchCurrentX = touch.screenX;
+    const touchCurrentY = touch.screenY;
+
+    // Calculate distance moved
+    const distX = touchCurrentX - touchStartX;
+    const distY = touchCurrentY - touchStartY;
+    if (Math.abs(distX) > 10 || Math.abs(distY) > 10) {
+      window.isSwiping = true;
+    }
+
+    // Only start dragging if horizontal movement is greater than vertical
+    if (
+      !isDragging &&
+      Math.abs(distX) > Math.abs(distY) &&
+      Math.abs(distX) > 10
+    ) {
+      isDragging = true;
+      lastTouchX = touchCurrentX;
+      // Apply hardware acceleration to the body
+      doc.body.style.transform = "translateZ(0)";
+      if (animation === "mimical" && readerMode !== "scroll") {
+        let bookDiv = document.getElementById("book");
+        if (bookDiv) {
+          bookDiv.style.display = "block";
+          render.mouseDownHandler(event);
+        }
+      }
+      return;
+    }
+    if (isDragging && animation === "mimical" && readerMode !== "scroll") {
+      render.mouseMoveHandler(event);
+    }
+    // If we're in dragging mode, apply direct transform for better performance
+    if (isDragging && animation === "sliding" && readerMode !== "scroll") {
+      let tempDoc = format === "PDF" ? outerDoc : doc;
+      // Calculate the delta since last move event
+      const deltaX = touchCurrentX - lastTouchX;
+
+      const currentScrollLeft = tempDoc.body.scrollLeft;
+      tempDoc.body.scrollLeft = currentScrollLeft - deltaX;
+
+      // Update last position
+      lastTouchX = touchCurrentX;
+
+      // Request animation frame for smoother updates (optional)
+      requestAnimationFrame(() => {
+        // Additional visual feedback can be added here
+      });
+    }
+  };
+  doc.addEventListener("touchend", onTouchEnd, false);
+  doc.addEventListener("touchstart", onTouchStart, false);
+  doc.addEventListener("touchmove", onTouchMove, false);
+  doc.addEventListener(
+    "pointermove",
+    (event) => {
+      if (!iWin.getSelection().toString().trim()) return;
+      selectionAutoTurn?.onTouchMove(event.clientX, event.clientY);
+    },
+    { passive: true }
+  );
+  // Add this with the other event listeners
+  doc.addEventListener(
+    "click",
+    (event) => {
+      preventLinkNavigation(event, doc, render);
+    },
+    true
+  ); // Use capturing phase
+
+  let startSelectionTime = 0;
+  let selectionCount = 0;
+  let triggerSelectionMenu = async (event: any) => {
+    const selectedText = iWin.getSelection().toString().trim();
+    if (selectedText) {
+      var range = iWin.getSelection().getRangeAt(0);
+      let pageSize = render.getPageSize();
+      var rect = range.getBoundingClientRect();
+      if (format === "PDF") {
+        let clientRects = range.getClientRects();
+        if (clientRects.length > 0) {
+          //combine all the rects
+          clientRects = Array.from(clientRects).filter((item: any) => {
+            return (
+              Math.abs(item.height - pageSize.sectionHeight) > 10 &&
+              Math.abs(item.width - pageSize.sectionWidth) > 10 &&
+              item.height > 0 &&
+              item.width > 0
+            );
+          });
+          let minTop = Infinity;
+          let minLeft = Infinity;
+          let maxBottom = -Infinity;
+          let maxRight = -Infinity;
+
+          for (let i = 0; i < clientRects.length; i++) {
+            const rect = clientRects[i];
+            minTop = Math.min(minTop, rect.top);
+            minLeft = Math.min(minLeft, rect.left);
+            maxBottom = Math.max(maxBottom, rect.bottom);
+            maxRight = Math.max(maxRight, rect.right);
+          }
+
+          // Create the combined rectangle object
+          const combinedRect = {
+            top: minTop,
+            left: minLeft,
+            bottom: maxBottom,
+            right: maxRight,
+            width: maxRight - minLeft,
+            height: maxBottom - minTop,
+          };
+          rect = combinedRect;
+        }
+      }
+      var position: any = {
+        top: rect.top - element.scrollTop,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+        screenWidth: window.innerWidth,
+        screenHeight: window.innerHeight,
+        sectionHeight: pageSize.sectionHeight,
+        sectionWidth: pageSize.sectionWidth,
+        gap: pageSize.gap,
+        scale: window.visualViewport.scale,
+        offsetLeft: offsetLeft,
+        offsetTop: offsetTop,
+      };
+      rangy.init();
+      let charRange = null;
+      if (format === "PDF") {
+        try {
+          let target: any = event.target;
+          let targetIframe = target.ownerDocument?.defaultView?.frameElement;
+          let id = targetIframe?.getAttribute("id") || "";
+          let chapterDocIndex = id ? parseInt(id.split("-").reverse()[0]) : 0;
+          charRange = await render.getHightlightCoords(chapterDocIndex);
+          position.chapterDocIndex = chapterDocIndex + "";
+          let subContainer = targetIframe.parentElement;
+          if (subContainer) {
+            position.top =
+              position.top +
+              parseFloat(subContainer.getBoundingClientRect().top);
+          }
+        } catch (error) {
+          console.error("Error getting highlight coords:", error);
+        }
+      } else {
+        charRange = await render.getHightlightCoords();
+      }
+      let sentence = getSelectionSentence(doc);
+      window.ReactNativeWebView.postMessage(
+        JSON.stringify({
+          event: "select-text",
+          selectedText: selectedText,
+          sentence: sentence,
+          position: position,
+          range: charRange,
+        })
+      );
+    }
+  };
+  doc.body.oncontextmenu = function (event) {
+    const target: any = event.target;
+    if (!target) return;
+    let linkElement = findLinkElement(target);
+    if (linkElement) {
+      return;
+    }
+    if (target.tagName === "IMG" || target.tagName === "image") {
+      const imgSrc = target.src || target.getAttribute("xlink:href");
+      //blob to base64
+      if (imgSrc.startsWith("blob:")) {
+        blobUrlToBase64(imgSrc).then((base64) => {
+          window.ReactNativeWebView.postMessage(
+            JSON.stringify({ event: "view-image", imgSrc: base64 })
+          );
+        });
+      }
+      return;
+    }
+    if (Date.now() - startSelectionTime < 100) {
+      setTimeout(() => {
+        if (selectionCount === 1) {
+          triggerSelectionMenu(event);
+        }
+      }, 600);
+    } else {
+      triggerSelectionMenu(event);
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    return false;
+  };
+  let scrollLeft = 0;
+  let scrollTop = 0;
+  let offsetLeft = 0;
+  let offsetTop = 0;
+  doc.addEventListener(
+    "selectstart",
+    (event) => {
+      selectionCount = 0;
+      startSelectionTime = Date.now();
+      offsetLeft = getScreenLeftOffset();
+      offsetTop = getScreenTopOffset();
+      if (readerMode === "scroll") return;
+      selectionAutoTurn?.onSelectStart();
+      if (format === "PDF") {
+        scrollLeft = doc.body.scrollLeft;
+        scrollTop = doc.body.scrollTop;
+      }
+    },
+    false
+  );
+  let lastSelectionChangeTime = 0;
+  const SELECTION_THROTTLE_DELAY = 3000; // 3秒
+  let selectionMenuTimer: any = null; // 新增: 用于延迟触发选择菜单的计时器
+
+  doc.addEventListener(
+    "selectionchange",
+    (event) => {
+      // 新增: 清除之前的定时器
+      if (format !== "PDF") {
+        if (selectionMenuTimer) {
+          clearTimeout(selectionMenuTimer);
+        }
+
+        // 新增: 设置3秒后触发选择菜单
+        selectionMenuTimer = setTimeout(() => {
+          triggerSelectionMenu(event);
+          selectionMenuTimer = null;
+        }, 1000);
+      }
+      const selectedText = iWin.getSelection().toString().trim();
+      if (!selectedText) {
+        selectionAutoTurn?.onSelectionCleared();
+        return;
+      }
+      if (selectionAutoTurn) {
+        selectionAutoTurn.onSelectionChange();
+      } else {
+        if (scrollLeft > 0) {
+          doc.body.scrollLeft = scrollLeft;
+        }
+        if (scrollTop > 0) {
+          doc.body.scrollTop = scrollTop;
+        }
+      }
+      selectionCount++;
+
+      const now = Date.now();
+
+      // 检查是否超过3秒间隔
+      if (now - lastSelectionChangeTime >= SELECTION_THROTTLE_DELAY) {
+        // 更新最后触发时间
+        lastSelectionChangeTime = now;
+
+        // 执行原有逻辑
+        window.ReactNativeWebView.postMessage(
+          JSON.stringify({ event: "selection-change" })
+        );
+      }
+    },
+    false
+  );
+  doc.addEventListener("scroll", () => {
+    if (readerMode === "single" || readerMode === "double") {
+      if (selectionAutoTurn) {
+        selectionAutoTurn.applyScrollPin();
+      } else {
+        const selectedText = iWin.getSelection().toString().trim();
+        if (selectedText && scrollLeft > 0) {
+          doc.body.scrollLeft = scrollLeft;
+        }
+        if (selectedText && scrollTop > 0) {
+          doc.body.scrollTop = scrollTop;
+        }
+      }
+    }
+  });
+};
+
+export const addAppleTouchEvent = (
+  doc: Document,
+  iframe: any,
+  element: HTMLElement,
+  readerMode: string,
+  animation: string,
+  format: string,
+  touchControlRules: any,
+  render: any
+) => {
+  let iWin: any = iframe.contentWindow || iframe.contentDocument?.defaultView;
+  let outerDoc: any = render.getDocument();
+  let touchStartTime = 0;
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let lastTouchEnd = 0;
+  let lastSelectEnd = 0;
+  let swipeThreshold = 30; // Minimum distance in pixels to be considered a swipe
+  const timeThreshold = 500; // Maximum time in milliseconds to be considered a tap
+  let section = Math.floor(element.clientWidth / 12);
+  let gap = section % 2 === 0 ? section : section - 1;
+  const selectionAutoTurn = createSelectionAutoTurn({
+    element,
+    iframe,
+    doc,
+    render,
+    readerMode,
+    format,
+    enableScrollPin: false,
+  });
+  let onTouchEnd = async function (event) {
+    window.isSwiping = false;
+    let now = new Date().getTime();
+    if (now - lastTouchEnd <= 300) {
+      event.preventDefault();
+      return;
+    }
+    lastTouchEnd = now;
+    const touch = event.changedTouches[0];
+    const touchEndTime = Date.now();
+    const touchEndX = touch.screenX;
+    const touchEndY = touch.screenY;
+    const timeDiff = touchEndTime - touchStartTime;
+    const distX = touchEndX - touchStartX;
+    const distY = touchEndY - touchStartY;
+    if (
+      isDragging &&
+      (animation === "mimical" || animation === "none") &&
+      readerMode !== "scroll"
+    ) {
+      isDragging = false;
+      render.mouseUpHandler(event);
+      if (
+        touchEndX < (window.innerWidth / 4) * 3 &&
+        touchEndX - touchStartX < 0
+      ) {
+        render.next();
+        isDragging = false;
+      } else if (
+        touchEndX > (window.innerWidth / 4) * 1 &&
+        touchEndX - touchStartX > 0
+      ) {
+        render.prev();
+        isDragging = false;
+      }
+      setTimeout(() => {
+        let bookDiv = document.getElementById("book");
+        if (bookDiv) {
+          bookDiv.style.display = "none";
+        }
+      }, 400);
+
+      return;
+    }
+    // Replace the scrollTo implementation with this optimized version
+    if (isDragging && animation === "sliding" && readerMode !== "scroll") {
+      const dragPercentage = Math.abs(distX) / window.innerWidth;
+      const dragThreshold = 0.1; // Only 10% drag needed to change page
+
+      if (distX > 0 && dragPercentage > dragThreshold) {
+        // Dragged right (go to previous page)
+        slideAnimateTo("left", format, doc, outerDoc, element, render, gap);
+      } else if (distX < 0 && dragPercentage > dragThreshold) {
+        // Dragged left (go to next page)
+        slideAnimateTo("right", format, doc, outerDoc, element, render, gap);
+      } else {
+        // Stay on current page
+        slideAnimateTo("stay", format, doc, outerDoc, element, render, gap);
+      }
+
+      return;
+    }
+    const selectedText = iWin.getSelection().toString().trim();
+
+    if (selectedText) {
+      var range = iWin.getSelection().getRangeAt(0);
+      var rect = range.getBoundingClientRect();
+      var pageSize = render.getPageSize();
+      var position: any = {
+        top: rect.top - element.scrollTop,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+        screenWidth: window.innerWidth,
+        screenHeight: window.innerHeight,
+        sectionHeight: pageSize.sectionHeight,
+        sectionWidth: pageSize.sectionWidth,
+        gap: pageSize.gap,
+        scale: window.visualViewport.scale,
+        offsetLeft: getScreenLeftOffset(),
+        offsetTop: getScreenTopOffset(),
+      };
+      rangy.init();
+      let charRange = null;
+      if (format === "PDF") {
+        let target: any = event.target;
+        let ownerDoc = target.ownerDocument;
+        let targetIframe = ownerDoc?.defaultView?.frameElement;
+        let id = targetIframe?.getAttribute("id") || "";
+        let chapterDocIndex = id ? parseInt(id.split("-").reverse()[0]) : 0;
+        position.chapterDocIndex = chapterDocIndex + "";
+        charRange = await render.getHightlightCoords(chapterDocIndex);
+        let subContainer = targetIframe.parentElement;
+        if (subContainer) {
+          position.top =
+            position.top + parseFloat(subContainer.getBoundingClientRect().top);
+        }
+      } else {
+        charRange = await render.getHightlightCoords();
+      }
+      let sentence = getSelectionSentence(doc);
+      window.ReactNativeWebView.postMessage(
+        JSON.stringify({
+          event: "select-text",
+          selectedText: selectedText,
+          sentence: sentence,
+          position: position,
+          range: charRange,
+        })
+      );
+      return;
+    }
+    if (!selectedText) {
+      selectionAutoTurn?.onSelectionCleared();
+    }
+    if (timeDiff > timeThreshold) {
+      const target: any = event.target;
+      if (!target) return;
+      let linkElement = findLinkElement(target);
+      if (linkElement) {
+        return;
+      }
+      if (target.tagName === "IMG" || target.tagName === "image") {
+        const imgSrc = target.src || target.getAttribute("xlink:href");
+        //blob to base64
+        if (imgSrc.startsWith("blob:")) {
+          blobUrlToBase64(imgSrc).then((base64) => {
+            window.ReactNativeWebView.postMessage(
+              JSON.stringify({ event: "view-image", imgSrc: base64 })
+            );
+          });
+        }
+        return;
+      }
+    }
+    if (
+      timeDiff < timeThreshold &&
+      Math.abs(distX) < swipeThreshold &&
+      Math.abs(distY) < swipeThreshold
+    ) {
+      const width = document.documentElement.clientWidth;
+      const height = document.documentElement.clientHeight;
+      let normalizedX = Math.min(Math.max(touchEndX, 0), width);
+      let normalizedY = Math.min(Math.max(touchEndY, 0), height);
+
+      if (format === "PDF" && readerMode === "double") {
+        let target: any = event.target;
+        let ownerDoc = target.ownerDocument;
+        let targetIframe = ownerDoc?.defaultView?.frameElement;
+        let id = targetIframe?.getAttribute("id") || "";
+        let chapterDocIndex = id ? parseInt(id.split("-").reverse()[0]) : 0;
+        if (chapterDocIndex % 2 === 1) {
+          normalizedX = normalizedX + width / 2;
+        }
+      }
+
+      // For pagination mode: keep original 3x3 grid
+      const cellWidth = width / 3;
+      const cellHeight = height / 3;
+      const col = Math.min(Math.floor(normalizedX / cellWidth), 2);
+      const row = Math.min(Math.floor(normalizedY / cellHeight), 2);
+      let result = getTouchAction(col, row, touchControlRules);
+      if (animation === "sliding" && readerMode !== "scroll") {
+        if (result === "right") {
+          slideAnimateTo("right", format, doc, outerDoc, element, render, gap);
+          return;
+        } else if (result === "left") {
+          slideAnimateTo("left", format, doc, outerDoc, element, render, gap);
+          return;
+        }
+      }
+      window.ReactNativeWebView.postMessage(JSON.stringify({ event: result }));
+    } else if (
+      Math.abs(distX) >= swipeThreshold ||
+      Math.abs(distY) >= swipeThreshold
+    ) {
+      window.ReactNativeWebView.postMessage(
+        JSON.stringify({
+          event: "swipe",
+        })
+      );
+      if (
+        readerMode === "scroll" &&
+        Math.abs(
+          element.scrollHeight - element.scrollTop - element.clientHeight
+        ) < 10
+      ) {
+        window.ReactNativeWebView.postMessage(
+          JSON.stringify({ event: "scroll-bottom" })
+        );
+      }
+      if (readerMode === "scroll" && element.scrollTop === 0) {
+        window.ReactNativeWebView.postMessage(
+          JSON.stringify({ event: "scroll-top" })
+        );
+      }
+    }
+  };
+  let onTouchStart = function (event) {
+    const target = event.target;
+    if (!target) return;
+
+    const linkElement = findLinkElement(target);
+    if (linkElement) {
+      return;
+    }
+    //// 注释掉解决无法双指缩放pdf的问题
+    // if (event.touches.length > 1) {
+    //   event.preventDefault();
+    // }
+    const touch = event.touches[0];
+    touchStartTime = Date.now();
+    touchStartX = touch.screenX;
+    touchStartY = touch.screenY;
+  };
+  let lastTouchX = 0;
+
+  let onTouchMove = function (event) {
+    const selectedText = iWin.getSelection().toString().trim();
+
+    if (selectedText) {
+      const touch = event.touches[0];
+      selectionAutoTurn?.onTouchMove(touch.clientX, touch.clientY);
+      return;
+    }
+
+    // Skip handling if not dragging yet and still determining direction
+    if (!isDragging && Math.abs(event.touches[0].screenX - touchStartX) <= 10) {
+      return;
+    }
+    if (window.visualViewport.scale > 1 && format === "PDF") {
+      return;
+    }
+    if (readerMode !== "scroll") {
+      event.preventDefault();
+    }
+
+    const touch = event.touches[0];
+    const touchCurrentX = touch.screenX;
+    const touchCurrentY = touch.screenY;
+
+    // Calculate distance moved
+    const distX = touchCurrentX - touchStartX;
+    const distY = touchCurrentY - touchStartY;
+
+    // Only start dragging if horizontal movement is greater than vertical
+    if (
+      !isDragging &&
+      Math.abs(distX) > Math.abs(distY) &&
+      Math.abs(distX) > 10
+    ) {
+      isDragging = true;
+      lastTouchX = touchCurrentX;
+
+      if (animation === "mimical" && readerMode !== "scroll") {
+        window.isSwiping = true;
+        let bookDiv = document.getElementById("book");
+        if (bookDiv) {
+          bookDiv.style.display = "block";
+          render.mouseDownHandler(event);
+        }
+      }
+      return;
+    }
+    if (isDragging && animation === "mimical" && readerMode !== "scroll") {
+      render.mouseMoveHandler(event);
+    }
+    // If we're in dragging mode, apply direct transform for better performance
+    if (isDragging && animation === "sliding" && readerMode !== "scroll") {
+      window.isSwiping = true;
+      let tempDoc = format === "PDF" ? outerDoc : doc;
+      // Calculate the delta since last move event
+      const deltaX = touchCurrentX - lastTouchX;
+
+      // Use transform instead of scrollBy for smoother rendering
+      const currentScrollLeft = tempDoc.body.scrollLeft;
+      tempDoc.body.scrollLeft = currentScrollLeft - deltaX;
+
+      // Update last position
+      lastTouchX = touchCurrentX;
+
+      // Request animation frame for smoother updates (optional)
+      requestAnimationFrame(() => {
+        // Additional visual feedback can be added here
+      });
+    }
+  };
+
+  // Add passive: false to ensure preventDefault works
+  doc.addEventListener("touchend", onTouchEnd, { passive: false });
+  doc.addEventListener("touchstart", onTouchStart, { passive: false });
+  doc.addEventListener("touchmove", onTouchMove, { passive: false });
+  doc.addEventListener(
+    "pointermove",
+    (event) => {
+      if (!iWin.getSelection().toString().trim()) return;
+      selectionAutoTurn?.onTouchMove(event.clientX, event.clientY);
+    },
+    { passive: true }
+  );
+  // Add this with the other event listeners
+  doc.addEventListener(
+    "click",
+    (event) => {
+      preventLinkNavigation(event, doc, render);
+    },
+    true
+  ); // Use capturing phase
+
+  doc.body.oncontextmenu = function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    return false;
+  };
+  doc.addEventListener(
+    "selectstart",
+    () => {
+      if (readerMode === "scroll") return;
+      selectionAutoTurn?.onSelectStart();
+    },
+    false
+  );
+  let lastSelectionChangeTime = 0;
+  const SELECTION_THROTTLE_DELAY = 3000; // 3秒
+  doc.addEventListener(
+    "selectionchange",
+    (event) => {
+      const selectedText = iWin.getSelection().toString().trim();
+      if (!selectedText) {
+        selectionAutoTurn?.onSelectionCleared();
+        return;
+      }
+      selectionAutoTurn?.onSelectionChange();
+      const now = Date.now();
+
+      // 检查是否超过3秒间隔
+      if (now - lastSelectionChangeTime >= SELECTION_THROTTLE_DELAY) {
+        // 更新最后触发时间
+        lastSelectionChangeTime = now;
+
+        // 执行原有逻辑
+        window.ReactNativeWebView.postMessage(
+          JSON.stringify({ event: "selection-change" })
+        );
+      }
+    },
+    { passive: false }
+  );
+};
