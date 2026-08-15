@@ -32,6 +32,9 @@ class PdfRender extends GeneralRender {
   };
   password: string = "";
   pdfScale: number = 0;
+  // chapters whose pdf render is currently in flight; prevents two concurrent
+  // renderers from clearing each other's sub-document mid-render
+  private _pdfRenderingChapters: Set<number> = new Set();
   scale: number = 1;
   backgroundColor: string;
   isScannedPDF: string;
@@ -1154,7 +1157,12 @@ class PdfRender extends GeneralRender {
     if (subDoc.body.innerHTML) {
       return;
     }
-    subDoc.body.innerHTML = "";
+    if (this._pdfRenderingChapters.has(chapterDocIndex)) {
+      return;
+    }
+    this._pdfRenderingChapters.add(chapterDocIndex);
+    try {
+      subDoc.body.innerHTML = "";
     let blob = await fetch(
       await this.chapterDocList[chapterDocIndex].text.load()
     ).then((r) => r.blob());
@@ -1286,6 +1294,9 @@ class PdfRender extends GeneralRender {
       }
     }
     this.trigger("rendered", [chapterDocIndex] as any);
+    } finally {
+      this._pdfRenderingChapters.delete(chapterDocIndex);
+    }
   }
   applyFabricBrush(canvas: any) {
     if (!canvas) return;

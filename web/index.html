@@ -85,18 +85,20 @@
     <p>
       <button id="syncBtn" onclick="triggerSync()">Sync with Google Drive</button>
       <button onclick="loadFiles()">Refresh List</button>
+      <button onclick="clearAllCache()">Clear All Cache</button>
     </p>
 
     <hr>
 
-    <h3>Location: <span id="breadcrumbs">Archive Root</span></h3>
+    <h3>
+      <button id="backBtn" onclick="goBack()" style="display: none; margin-right: 8px;">⬅ Back</button>
+      <span id="breadcrumbs">Archive Root</span>
+    </h3>
 
-    <h4>Folders</h4>
     <ul id="folderList">
       <li>(No folders)</li>
     </ul>
 
-    <h4>Books & Files</h4>
     <ul id="bookList">
       <li>Loading files...</li>
     </ul>
@@ -130,13 +132,26 @@
         &nbsp;|&nbsp;
         <button onclick="prevPage()">⏮ Prev</button>
         <button onclick="nextPage()">Next ⏭</button>
+        &nbsp;|&nbsp;
+        <span id="pdfZoomControls" style="display: none;">
+          <button onclick="zoomPdf(0.9)">−</button>
+          <span id="pdfZoomLabel">100%</span>
+          <button onclick="zoomPdf(1.1)">+</button>
+          <button onclick="resetPdfZoom()">Fit</button>
+        </span>
+        <span id="spacingControls" style="display: none;">
+          <label>Word:</label>
+          <input type="range" id="wordSpacingSlider" min="0" max="10" step="0.5" value="0" oninput="changeWordSpacing(this.value)" title="Word spacing">
+          <label>Letter:</label>
+          <input type="range" id="letterSpacingSlider" min="0" max="5" step="0.1" value="0" oninput="changeLetterSpacing(this.value)" title="Letter spacing">
+        </span>
       </div>
     </div>
 
     <div id="readerStatus" style="font-size: 12px; color: #666; margin: 6px 0;">Ready</div>
 
     <!-- Reader Frame Container with Loading Overlay -->
-    <div style="position: relative; width: 100%; height: 80vh; border: 1px solid #ccc; background: #ffffff; margin-top: 6px;">
+    <div id="readerFrame" style="position: relative; width: 50vw; height: 95vh; border: 1px solid #ccc; background: #ffffff; margin: 6px auto 0;">
       <!-- Loading Overlay with Spinner -->
       <div id="loadingOverlay" style="display: none;">
         <div style="display: flex; align-items: center; margin-bottom: 8px;">
@@ -156,6 +171,12 @@
     let currentRendition = null;
     let currentBookData = null;
     let currentReaderMode = 'single';
+    let currentPdfZoom = 1;
+    let currentWordSpacing = 0;
+    let currentLetterSpacing = 0;
+    let __crumbs = [];
+    let __savePosTimer = null;
+    let __building = false;
 
     function log(msg) {
       const box = document.getElementById('logBox');
@@ -225,7 +246,10 @@
     }
 
     function renderBreadcrumbs(crumbs = []) {
+      __crumbs = crumbs || [];
       const el = document.getElementById('breadcrumbs');
+      const backBtn = document.getElementById('backBtn');
+      if (backBtn) backBtn.style.display = (__crumbs.length >= 2) ? 'inline-block' : 'none';
       if (!crumbs || crumbs.length === 0) {
         el.textContent = 'Archive Root';
         return;
@@ -234,6 +258,12 @@
         if (i === crumbs.length - 1) return `<strong>${c.name}</strong>`;
         return `<a href="#" onclick="loadFiles('${c.id}'); return false;">${c.name}</a> / `;
       }).join('');
+    }
+
+    function goBack() {
+      if (__crumbs.length < 2) return;
+      const parent = __crumbs[__crumbs.length - 2];
+      loadFiles(parent ? parent.id : null);
     }
 
     function renderLists(folders = [], books = []) {
@@ -310,7 +340,15 @@
 
       document.getElementById('readerBookTitle').textContent = bookName;
       document.getElementById('readerBookFormat').textContent = `[${bookFormat}]`;
-      
+
+      currentPdfZoom = 1;
+      updatePdfZoomLabel();
+      togglePdfZoomControls(bookFormat.toUpperCase());
+      toggleSpacingControls(bookFormat.toUpperCase());
+      loadSpacingSettings();
+      const frame = document.getElementById('readerFrame');
+      if (frame) frame.style.width = '50vw';
+
       const pageArea = document.getElementById('page-area');
       pageArea.innerHTML = '';
 
@@ -334,92 +372,247 @@
           buffer
         };
 
-        showLoading('Initializing Kookit engine...', `Parsing ${bookFormat} metadata and structure...`);
+        await buildRendition({});
 
-        if (!window.Kookit) {
-          throw new Error('Kookit library is not loaded.');
-        }
-
-        window.transMap = window.transMap || {};
-
-        const config = {
-          format: bookFormat.toUpperCase(),
-          readerMode: currentReaderMode,
-          animation: 'none',
-          charset: 'utf-8',
-          isDarkMode: 'no',
-          convertChinese: 'no',
-          isConvertPDF: 'no',
-          isMobile: 'no',
-          backgroundColor: '#ffffff'
-        };
-
-        // Create Rendition instance
-        let rendition = null;
-        if (window.Kookit.BookHelper && typeof window.Kookit.BookHelper.getRendition === 'function') {
-          rendition = window.Kookit.BookHelper.getRendition(buffer, config, window.Kookit);
-        } else {
-          const fmt = bookFormat.toUpperCase();
-          if (fmt === 'EPUB' && window.Kookit.EpubRender) {
-            rendition = new window.Kookit.EpubRender(buffer, config);
-          } else if ((fmt === 'MOBI' || fmt === 'AZW3' || fmt === 'AZW') && window.Kookit.MobiRender) {
-            rendition = new window.Kookit.MobiRender(buffer, config);
-          } else if (fmt === 'PDF' && window.Kookit.PdfRender) {
-            rendition = new window.Kookit.PdfRender(buffer, config);
-          } else if (fmt === 'TXT' && window.Kookit.TxtRender) {
-            rendition = new window.Kookit.TxtRender(buffer, config);
-          } else if (fmt === 'MD' && window.Kookit.MdRender) {
-            rendition = new window.Kookit.MdRender(buffer, config);
-          }
-        }
-
-        if (!rendition) {
-          throw new Error(`No compatible Kookit renderer for format: ${bookFormat}`);
-        }
-
-        currentRendition = rendition;
-        window.rendition = rendition;
-
-        showLoading('Rendering chapter...', 'Injecting iframe layout and styles...');
-
-        // 1. Render layout to container
-        await rendition.renderTo(pageArea);
-
-        // 2. Display the first chapter immediately
-        if (rendition.chapterDocList && rendition.chapterDocList.length > 0) {
-          await rendition.goToChapterDocIndex(0);
-        } else if (typeof rendition.goToChapter === 'function') {
-          await rendition.goToChapter(0);
-        }
-
-        // 3. Populate Table of Contents
-        await populateChapters(rendition);
-
-        // 4. Update status events
-        const statusEl = document.getElementById('readerStatus');
-        statusEl.textContent = 'Book loaded and ready.';
-
-        if (rendition.on) {
-          rendition.on('rendered', () => {
-            statusEl.textContent = 'Page rendered.';
-          });
-          rendition.on('page-changed', async () => {
-            if (typeof rendition.getPosition === 'function') {
-              const pos = rendition.getPosition();
-              statusEl.textContent = `Chapter ${pos?.chapterDocIndex ?? 0}`;
-            }
-          });
-        }
-
-        // 5. Hide loading overlay now that the book is fully visible
-        hideLoading();
         const totalDuration = Date.now() - startTime;
         log(`Book "${bookName}" ready in ${totalDuration}ms.`);
       } catch (err) {
         log(`Error reading with Kookit: ${err.message}`);
+        __building = false;
         showLoading('Failed to open book', err.message);
         setTimeout(hideLoading, 4000);
       }
+    }
+
+    // Build (or rebuild) the Kookit rendition from the in-memory book buffer.
+    // Reused by zoom to re-layout a PDF without refetching from the server.
+    async function buildRendition(overrides = {}) {
+      if (!currentBookData) throw new Error('No book data loaded.');
+      const { fileId, name, format, buffer } = currentBookData;
+
+      __building = true;
+      showLoading('Initializing Kookit engine...', `Parsing ${format} metadata and structure...`);
+
+      if (!window.Kookit) {
+        throw new Error('Kookit library is not loaded.');
+      }
+
+      window.transMap = window.transMap || {};
+
+      const config = Object.assign({
+        format: format.toUpperCase(),
+        readerMode: currentReaderMode,
+        animation: 'none',
+        charset: 'utf-8',
+        isDarkMode: 'no',
+        convertChinese: 'no',
+        isConvertPDF: 'no',
+        isMobile: 'no',
+        backgroundColor: '#ffffff'
+      }, overrides);
+
+      // Create Rendition instance
+      let rendition = null;
+      if (window.Kookit.BookHelper && typeof window.Kookit.BookHelper.getRendition === 'function') {
+        rendition = window.Kookit.BookHelper.getRendition(buffer, config, window.Kookit);
+      } else {
+        const fmt = format.toUpperCase();
+        if (fmt === 'EPUB' && window.Kookit.EpubRender) {
+          rendition = new window.Kookit.EpubRender(buffer, config);
+        } else if ((fmt === 'MOBI' || fmt === 'AZW3' || fmt === 'AZW') && window.Kookit.MobiRender) {
+          rendition = new window.Kookit.MobiRender(buffer, config);
+        } else if (fmt === 'PDF' && window.Kookit.PdfRender) {
+          rendition = new window.Kookit.PdfRender(buffer, config);
+        } else if (fmt === 'TXT' && window.Kookit.TxtRender) {
+          rendition = new window.Kookit.TxtRender(buffer, config);
+        } else if (fmt === 'MD' && window.Kookit.MdRender) {
+          rendition = new window.Kookit.MdRender(buffer, config);
+        }
+      }
+
+      if (!rendition) {
+        throw new Error(`No compatible Kookit renderer for format: ${format}`);
+      }
+
+      currentRendition = rendition;
+      window.rendition = rendition;
+
+      const pageArea = document.getElementById('page-area');
+
+      // Keep the previous build's iframe alive in a hidden container instead of
+      // destroying it here. Kookit's PDF prerenders run without await; if the
+      // iframe died mid-render, they would crash on the dead document and the
+      // position restore could fail. The old build is removed after it settles.
+      const prevFrame = pageArea.querySelector('iframe');
+      const limbo = document.createElement('div');
+      limbo.style.display = 'none';
+      document.body.appendChild(limbo);
+      if (prevFrame) {
+        limbo.appendChild(prevFrame);
+        setTimeout(() => limbo.remove(), 5000);
+      } else {
+        limbo.remove();
+      }
+      pageArea.innerHTML = '';
+
+      showLoading('Rendering chapter...', 'Injecting iframe layout and styles...');
+
+      // 1. Render layout to container
+      await rendition.renderTo(pageArea);
+
+      // 2. Display the first chapter immediately
+      if (rendition.chapterDocList && rendition.chapterDocList.length > 0) {
+        await rendition.goToChapterDocIndex(0);
+      } else if (typeof rendition.goToChapter === 'function') {
+        await rendition.goToChapter(0);
+      }
+
+      // 3. Populate Table of Contents
+      await populateChapters(rendition);
+
+      // 4. Update status events
+      const statusEl = document.getElementById('readerStatus');
+      statusEl.textContent = 'Book loaded and ready.';
+
+      if (rendition.on) {
+        rendition.on('rendered', () => {
+          statusEl.textContent = 'Page rendered.';
+        });
+        rendition.on('page-changed', async () => {
+          if (typeof rendition.getPosition === 'function') {
+            const pos = rendition.getPosition();
+            statusEl.textContent = `Chapter ${pos?.chapterDocIndex ?? 0}`;
+            saveReadingPosition();
+          }
+        });
+      }
+
+      // 5. Restore the saved reading position (if any), persist it, then hide
+      await restoreReadingPosition();
+      __building = false;
+      saveReadingPositionNow();
+      applySpacing();
+      hideLoading();
+    }
+
+    // ---- Reading position persistence (survives cache clear: stored in localStorage) ----
+
+    function saveReadingPositionNow() {
+      if (__building) return;
+      if (!currentBookData || !currentRendition) return;
+      if (typeof currentRendition.getPosition !== 'function') return;
+      try {
+        localStorage.setItem('eonz.reading.' + currentBookData.fileId, JSON.stringify(currentRendition.getPosition()));
+      } catch (e) {
+        console.warn('Could not save reading position:', e);
+      }
+    }
+
+    function saveReadingPosition() {
+      if (__savePosTimer) clearTimeout(__savePosTimer);
+      __savePosTimer = setTimeout(saveReadingPositionNow, 300);
+    }
+
+    async function restoreReadingPosition() {
+      if (!currentBookData || !currentRendition) return;
+      if (typeof currentRendition.goToPosition !== 'function') return;
+      const saved = localStorage.getItem('eonz.reading.' + currentBookData.fileId);
+      if (!saved) return;
+      try {
+        const pos = JSON.parse(saved);
+        if (pos && (pos.chapterDocIndex !== undefined || pos.xpath || pos.href)) {
+          await currentRendition.goToPosition(saved);
+        }
+      } catch (e) {
+        console.warn('Could not restore reading position:', e);
+      }
+    }
+
+    // ---- PDF zoom ----
+    // Kookit fits PDF pages to the container width and height at render time, so
+    // zoom is done by scaling the reader frame (width and height) and rebuilding
+    // the rendition from the buffer.
+
+    function togglePdfZoomControls(format) {
+      const el = document.getElementById('pdfZoomControls');
+      if (el) el.style.display = (format === 'PDF') ? 'inline-block' : 'none';
+    }
+
+    function updatePdfZoomLabel() {
+      const el = document.getElementById('pdfZoomLabel');
+      if (el) el.textContent = Math.round(currentPdfZoom * 100) + '%';
+    }
+
+    async function applyPdfZoom(nextZoom) {
+      currentPdfZoom = Math.min(3, Math.max(0.5, nextZoom));
+      updatePdfZoomLabel();
+      const frame = document.getElementById('readerFrame');
+      if (frame) {
+        frame.style.width = (50 * currentPdfZoom) + 'vw';
+        frame.style.height = (100 * currentPdfZoom) + 'vh';
+      }
+      if (!currentRendition) return;
+      saveReadingPositionNow();
+      try {
+        await buildRendition({});
+      } catch (e) {
+        log('PDF zoom failed: ' + e.message);
+      }
+    }
+
+    async function zoomPdf(factor) {
+      if (!currentBookData || currentBookData.format.toUpperCase() !== 'PDF') return;
+      await applyPdfZoom(currentPdfZoom * factor);
+    }
+
+    async function resetPdfZoom() {
+      if (!currentBookData || currentBookData.format.toUpperCase() !== 'PDF') return;
+      await applyPdfZoom(1);
+    }
+
+    // ---- Word / letter spacing (reflowable formats) ----
+    // The chapter content lives in the outer kookit iframe document, so a style
+    // element injected into that document's head applies to every chapter.
+
+    function toggleSpacingControls(format) {
+      const el = document.getElementById('spacingControls');
+      if (el) el.style.display = (format === 'PDF' || format === 'COMIC') ? 'none' : 'inline-block';
+    }
+
+    function loadSpacingSettings() {
+      currentWordSpacing = parseFloat(localStorage.getItem('eonz.spacing.word') || '0');
+      currentLetterSpacing = parseFloat(localStorage.getItem('eonz.spacing.letter') || '0');
+      if (isNaN(currentWordSpacing)) currentWordSpacing = 0;
+      if (isNaN(currentLetterSpacing)) currentLetterSpacing = 0;
+      const ws = document.getElementById('wordSpacingSlider');
+      const ls = document.getElementById('letterSpacingSlider');
+      if (ws) ws.value = String(currentWordSpacing);
+      if (ls) ls.value = String(currentLetterSpacing);
+    }
+
+    function applySpacing() {
+      if (!currentRendition || typeof currentRendition.getDocument !== 'function') return;
+      const doc = currentRendition.getDocument();
+      if (!doc || !doc.head) return;
+      let style = doc.getElementById('kookit-spacing-style');
+      if (!style) {
+        style = doc.createElement('style');
+        style.id = 'kookit-spacing-style';
+        doc.head.appendChild(style);
+      }
+      style.textContent = `body * { word-spacing: ${currentWordSpacing}px !important; letter-spacing: ${currentLetterSpacing}px !important; }`;
+    }
+
+    function changeWordSpacing(value) {
+      currentWordSpacing = parseFloat(value) || 0;
+      localStorage.setItem('eonz.spacing.word', String(currentWordSpacing));
+      applySpacing();
+    }
+
+    function changeLetterSpacing(value) {
+      currentLetterSpacing = parseFloat(value) || 0;
+      localStorage.setItem('eonz.spacing.letter', String(currentLetterSpacing));
+      applySpacing();
     }
 
     async function populateChapters(rendition) {
@@ -474,6 +667,7 @@
     }
 
     function closeReader() {
+      saveReadingPositionNow();
       document.getElementById('readerView').style.display = 'none';
       document.getElementById('libraryView').style.display = 'block';
       const pageArea = document.getElementById('page-area');
@@ -483,6 +677,8 @@
       loadStatus();
       loadFiles(currentFolderId);
     }
+
+    window.addEventListener('beforeunload', saveReadingPositionNow);
 
     // Keyboard navigation (Left / Right arrow keys)
     window.addEventListener('keydown', (e) => {
@@ -509,6 +705,24 @@
         }
       } catch (err) {
         log('Error deleting cache: ' + err.message);
+      }
+    }
+
+    async function clearAllCache() {
+      if (!confirm('Clear all cached books from disk?')) return;
+      try {
+        const res = await fetch('/api/cache', { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+          log(`All cache cleared (${data.data?.count ?? 0} files removed).`);
+        } else {
+          log('Clear cache failed: ' + data.error);
+        }
+      } catch (err) {
+        log('Clear cache error: ' + err.message);
+      } finally {
+        await loadStatus();
+        await loadFiles(currentFolderId);
       }
     }
 

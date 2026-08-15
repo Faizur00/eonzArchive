@@ -60,6 +60,7 @@ const render = async (
   isKeepPDFBackground
 ) => {
   try {
+    if (!doc || !doc.defaultView) return;
     let devicePixelRatio =
       window.devicePixelRatio * (isMobile === "yes" ? (1 / zoom) * 1.5 : 1);
     const scale = zoom * devicePixelRatio;
@@ -94,6 +95,9 @@ const render = async (
     } catch (error) {
       console.error(error);
     }
+    // the document can be destroyed while the render awaits (for example, the
+    // reader frame is rebuilt during a PDF zoom); bail out if that happened
+    if (!doc.defaultView) return;
     doc.querySelector("#canvas").replaceChildren(doc.adoptNode(canvas));
     docLayer.style.overflow = "hidden";
     const container = doc.querySelector("#textLayer");
