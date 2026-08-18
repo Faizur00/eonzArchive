@@ -1,14 +1,23 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" data-theme="dark" data-reader-theme="dark">
 <head>
   <meta charset="utf-8">
-  <title>Google Drive Ebook Archive</title>
-  <!-- Load pdf.js first, then inject the Kookit UMD bundle.
-       Kookit's PDF renderer reads window.pdfjsLib at bundle-eval time,
-       so pdf.js must be present before the classic script runs. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EONZ ARCHIVE - DIGITAL LIBRARY</title>
+  <meta name="description" content="Personal archival library repository and reader.">
+
+  <!-- Design System Stylesheets -->
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/library.css">
+  <link rel="stylesheet" href="/css/reader.css">
+
+  <!-- PDF.js & Kookit Reader Engine Initialization -->
   <script type="module">
     await import("/lib/pdfjs/pdf.mjs");
-    pdfjsLib.GlobalWorkerOptions.workerSrc = "/lib/pdfjs/pdf.worker.mjs";
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "/lib/pdfjs/pdf.worker.mjs";
+    }
     window.__kookitReady = new Promise((resolve) => {
       const s = document.createElement("script");
       s.src = "/kookit/dist/kookit.umd.js";
@@ -17,10 +26,9 @@
       document.head.appendChild(s);
     });
   </script>
+
+  <!-- Same-origin API Token Interceptor -->
   <script>
-    // Attach the API token (embedded by the server) to every same-origin /api request.
-    // The server rejects /api calls without a matching X-Request-Token header.
-    // The token is read at call time because the server injects it later in <head>.
     (function () {
       const nativeFetch = window.fetch.bind(window);
       window.fetch = function (input, init) {
@@ -36,873 +44,344 @@
       };
     })();
   </script>
-  <style>
-    /* Basic, lightweight spinner animation */
-    .spinner {
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 3px solid rgba(0,0,0,0.15);
-      border-radius: 50%;
-      border-top-color: #2563eb;
-      animation: spin 0.8s linear infinite;
-      vertical-align: middle;
-      margin-right: 8px;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    #loadingOverlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(255, 255, 255, 0.95);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-      font-size: 15px;
-      color: #333;
-    }
-  </style>
 </head>
 <body>
-  <!-- Section 1: Library Explorer View -->
-  <div id="libraryView">
-    <h1>Google Drive Ebook Sync</h1>
 
-    <div>
-      <strong>Drive Connection:</strong> <span id="driveStatus">Checking...</span><br>
-      <strong>Archive Folder:</strong> <span id="folderInfo">Loading...</span><br>
-      <strong>Total Synced:</strong> <span id="syncStats">0 books, 0 folders</span><br>
-      <strong>Last Synced:</strong> <span id="lastSync">Never</span><br>
-      <strong>Local Cache:</strong> <span id="cacheStats">0 books cached</span>
-    </div>
+  <!-- =========================================================================
+       SECTION 1: LIBRARY VIEW (SWISS MINIMALIST & DIRECT ARCHIVAL FLOW)
+       ========================================================================= -->
+  <main id="libraryView">
+    
+    <!-- Minimalist App Bar -->
+    <header class="app-header">
+      <div class="brand-section">
+        <div class="brand-title-wrap">
+          <h1>EONZ ARCHIVE</h1>
+        </div>
+        <div class="brand-subtitle">
+          <span id="driveStatusPill" class="status-pill cached">
+            <span class="status-dot"></span> CONNECTED
+          </span>
+          <span>/</span>
+          <span id="rootFolderMeta">INDEX</span>
+        </div>
+      </div>
 
-    <p>
-      <button id="syncBtn" onclick="triggerSync()">Sync with Google Drive</button>
-      <button onclick="loadFiles()">Refresh List</button>
-      <button onclick="clearAllCache()">Clear All Cache</button>
-    </p>
+      <div class="header-actions">
+        <button id="syncBtn" class="btn btn-secondary btn-sm" onclick="Library.triggerSync()">
+          <svg class="icon icon-sm" viewBox="0 0 24 24">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+          </svg>
+          SYNC
+        </button>
 
-    <hr>
+        <button id="storageManagerBtn" class="btn btn-ghost btn-sm btn-icon" title="Storage Status">
+          <svg class="icon icon-sm" viewBox="0 0 24 24">
+            <rect width="20" height="8" x="2" y="2"/>
+            <rect width="20" height="8" x="2" y="14"/>
+            <line x1="6" y1="6" x2="6.01" y2="6"/>
+            <line x1="6" y1="18" x2="6.01" y2="18"/>
+          </svg>
+        </button>
 
-    <h3>
-      <button id="backBtn" onclick="goBack()" style="display: none; margin-right: 8px;">⬅ Back</button>
-      <span id="breadcrumbs">Archive Root</span>
-    </h3>
+        <button id="shortcutsBtn" class="btn btn-ghost btn-sm btn-icon" title="Keybindings">
+          <svg class="icon icon-sm" viewBox="0 0 24 24">
+            <rect width="18" height="12" x="3" y="6"/>
+            <path d="M7 10h.01M11 10h.01M15 10h.01M7 14h.01M17 14h.01M11 14h4"/>
+          </svg>
+        </button>
 
-    <ul id="folderList">
-      <li>(No folders)</li>
-    </ul>
+        <button id="themeToggleBtn" class="btn btn-ghost btn-sm btn-icon" title="Toggle Theme">
+          <svg class="icon icon-sm" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+        </button>
+      </div>
+    </header>
 
-    <ul id="bookList">
-      <li>Loading files...</li>
-    </ul>
+    <!-- Controls Bar (Format Filters, Sorting & View Toggle - No Search Bar) -->
+    <section class="controls-bar">
+      <div class="filter-pills">
+        <button class="pill-btn active" data-format="ALL">ALL</button>
+        <button class="pill-btn" data-format="EPUB">EPUB</button>
+        <button class="pill-btn" data-format="PDF">PDF</button>
+        <button class="pill-btn" data-format="MOBI">MOBI</button>
+        <button class="pill-btn" data-format="TXT">TXT</button>
+        <button class="pill-btn" data-format="MD">MD</button>
+        <button id="cachedOnlyToggle" class="pill-btn">CACHED</button>
+      </div>
 
-    <hr>
+      <div class="controls-right-group">
+        <select id="sortSelect" class="select-field" title="Sort documents">
+          <option value="name">INDEX (A-Z)</option>
+          <option value="size_desc">SIZE (DESC)</option>
+          <option value="size_asc">SIZE (ASC)</option>
+          <option value="date_desc">DATE (RECENT)</option>
+        </select>
 
-    <h4>Logs</h4>
-    <pre id="logBox" style="border: 1px solid #ccc; padding: 10px; min-height: 80px;">[Initialized]</pre>
-  </div>
+        <div class="view-mode-toggle">
+          <button id="viewGridBtn" class="view-btn active" title="Grid View">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3"/><rect width="7" height="7" x="14" y="3"/><rect width="7" height="7" x="14" y="14"/><rect width="7" height="7" x="3" y="14"/></svg>
+          </button>
+          <button id="viewListBtn" class="view-btn" title="Ledger List View">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
 
-  <!-- Section 2: Kookit Ebook Reader View -->
+    <!-- Minimal Breadcrumbs Path -->
+    <nav class="breadcrumbs-bar" aria-label="Directory Breadcrumbs">
+      <button id="breadcrumbBackBtn" class="breadcrumb-back" style="display: none;" onclick="Library.goBack()">
+        <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg> BACK
+      </button>
+      <div id="breadcrumbsTrail" class="breadcrumb-trail">
+        <span class="breadcrumb-item active">ROOT ARCHIVE</span>
+      </div>
+    </nav>
+
+    <!-- Subfolders Grid (Displayed immediately without section headers) -->
+    <div id="foldersGrid" class="folders-grid"></div>
+
+    <!-- Books Showcase (Displayed immediately without section headers) -->
+    <div id="booksContainer"></div>
+
+  </main>
+
+  <!-- =========================================================================
+       SECTION 2: IMMERSIVE READER VIEW
+       ========================================================================= -->
   <div id="readerView" style="display: none;">
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ccc; padding-bottom: 8px;">
-      <div>
-        <button onclick="closeReader()">⬅ Back to Library</button>
-        <strong id="readerBookTitle" style="margin-left: 10px; font-size: 16px;">Reading Book</strong>
-        <span id="readerBookFormat" style="margin-left: 6px; color: #666; font-size: 13px;">[EPUB]</span>
+    
+    <!-- Top Reading Progress Line -->
+    <div id="readingProgressBar" class="reading-progress-line"></div>
+
+    <!-- Top Reader Bar -->
+    <header class="reader-top-bar">
+      <div class="reader-bar-left">
+        <button class="btn btn-secondary btn-sm" onclick="Reader.closeReader()" title="Close Reader (Esc)">
+          <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          <span>INDEX</span>
+        </button>
+        <div class="reader-book-info">
+          <span id="readerFormatBadge" class="badge badge-epub">EPUB</span>
+          <span id="readerBookTitle" class="reader-book-title">Document Title</span>
+        </div>
       </div>
-      <div>
-        <label>Chapters: </label>
-        <select id="chapterSelect" onchange="jumpToChapter(this.value)">
-          <option value="">Table of Contents</option>
+
+      <div class="reader-bar-center">
+        <button id="tocToggleBtn" class="btn btn-secondary btn-sm" title="Table of Contents">
+          <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          <span id="readerChapterIndicator">SECTIONS</span>
+        </button>
+
+        <div class="reader-nav-btns">
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="Reader.prevPage()" title="Previous (←)">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="Reader.nextPage()" title="Next (→)">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="reader-bar-right">
+        <!-- PDF Zoom Controls -->
+        <div id="pdfZoomControls" style="display: none; align-items: center; gap: 2px;">
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="Reader.zoomPdf(0.85)" title="Zoom Out">−</button>
+          <span id="pdfZoomLabel" style="font-family: var(--font-mono); font-size: 11px; min-width: 36px; text-align: center;">100%</span>
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="Reader.zoomPdf(1.15)" title="Zoom In">+</button>
+          <button class="btn btn-secondary btn-sm" onclick="Reader.resetPdfZoom()" title="Fit">FIT</button>
+        </div>
+
+        <!-- Mode Select -->
+        <select id="readerModeSelect" class="select-field" style="padding: 4px 20px 4px 6px; font-size: 11px;">
+          <option value="single">PAGE</option>
+          <option value="scroll">SCROLL</option>
+          <option value="double">SPREAD</option>
         </select>
-        &nbsp;|&nbsp;
-        <label>Mode: </label>
-        <select id="modeSelect" onchange="changeReaderMode(this.value)">
-          <option value="single">Single Page</option>
-          <option value="scroll">Scroll</option>
-          <option value="double">Double Page</option>
-        </select>
-        &nbsp;|&nbsp;
-        <button onclick="prevPage()">⏮ Prev</button>
-        <button onclick="nextPage()">Next ⏭</button>
-        &nbsp;|&nbsp;
-        <span id="pdfZoomControls" style="display: none;">
-          <button onclick="zoomPdf(0.9)">−</button>
-          <span id="pdfZoomLabel">100%</span>
-          <button onclick="zoomPdf(1.1)">+</button>
-          <button onclick="resetPdfZoom()">Fit</button>
-        </span>
-        <span id="spacingControls" style="display: none;">
-          <label>Font:</label>
-          <button onclick="changeFontSize(-1)" title="Decrease font size">A−</button>
-          <span id="fontSizeLabel">100%</span>
-          <button onclick="changeFontSize(1)" title="Increase font size">A+</button>
-          <label>Word:</label>
-          <input type="range" id="wordSpacingSlider" min="0" max="10" step="0.5" value="0" oninput="changeWordSpacing(this.value)" title="Word spacing">
-          <label>Letter:</label>
-          <input type="range" id="letterSpacingSlider" min="0" max="5" step="0.1" value="0" oninput="changeLetterSpacing(this.value)" title="Letter spacing">
-        </span>
+
+        <!-- Appearance Settings Button -->
+        <button id="readerSettingsBtn" class="btn btn-secondary btn-sm btn-icon" title="Typography & Theme">
+          <svg class="icon icon-sm" viewBox="0 0 24 24">
+            <polyline points="4 7 4 4 20 4 20 7"/>
+            <line x1="9" y1="20" x2="15" y2="20"/>
+            <line x1="12" y1="4" x2="12" y2="20"/>
+          </svg>
+        </button>
+
+        <button id="fullscreenToggleBtn" class="btn btn-ghost btn-sm btn-icon" title="Fullscreen">
+          <svg class="icon icon-sm" viewBox="0 0 24 24">
+            <path d="M8 3H5v3m14 0V3h-3m0 18h3v-3M3 16v3h3"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Reading Stage -->
+    <div class="reader-stage">
+      
+      <!-- Side Navigation Chevrons -->
+      <button id="navHotspotPrev" class="nav-hotspot prev" title="Previous Page">
+        <svg class="icon icon-lg" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+
+      <!-- Centered Reader Frame -->
+      <div id="readerFrame">
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay">
+          <div class="loading-box">
+            <div class="spinner"></div>
+            <div id="loadingTitle">OPENING RECORD...</div>
+            <div id="loadingDetail">Preparing book layout...</div>
+          </div>
+        </div>
+
+        <!-- Kookit Iframe Container (ID must be page-area) -->
+        <div id="page-area"></div>
+
+        <!-- Footnote Popup -->
+        <div id="footnoteBackdrop" style="display:none; position:absolute; inset:0; z-index:790; background:rgba(0,0,0,0.2);" onclick="Reader.closeFootnote()"></div>
+        <div id="footnotePopup">
+          <div class="footnote-header">
+            <span>ARCHIVE FOOTNOTE</span>
+            <button onclick="Reader.closeFootnote()" style="background:none; border:none; color:var(--text-muted); cursor:pointer;">✕</button>
+          </div>
+          <div id="footnoteContent"></div>
+        </div>
+      </div>
+
+      <button id="navHotspotNext" class="nav-hotspot next" title="Next Page">
+        <svg class="icon icon-lg" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+
+    </div>
+
+    <!-- Table of Contents Side Drawer -->
+    <div id="tocBackdrop" class="toc-backdrop"></div>
+    <aside id="tocDrawer" class="toc-drawer">
+      <div class="toc-header">
+        <h3>INDEX OF SECTIONS</h3>
+        <button id="tocCloseBtn" class="btn btn-ghost btn-sm btn-icon">✕</button>
+      </div>
+      <div class="toc-search">
+        <input type="text" id="tocSearchInput" placeholder="FILTER SECTIONS...">
+      </div>
+      <ul id="tocList" class="toc-list"></ul>
+    </aside>
+
+    <!-- Appearance / Settings Popover -->
+    <div id="readerSettingsPopover" class="settings-popover">
+      <div class="settings-group">
+        <div class="settings-label">SURFACE THEME</div>
+        <div class="theme-selector-grid">
+          <button class="reader-theme-btn theme-dark active" data-rtheme="dark">DARK</button>
+          <button class="reader-theme-btn theme-bone" data-rtheme="bone">BONE</button>
+          <button class="reader-theme-btn theme-light" data-rtheme="light">LIGHT</button>
+          <button class="reader-theme-btn theme-oled" data-rtheme="oled">OLED</button>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-label">FRAME WIDTH</div>
+        <div class="width-presets">
+          <button class="width-btn" data-width="compact">50%</button>
+          <button class="width-btn active" data-width="standard">65%</button>
+          <button class="width-btn" data-width="wide">80%</button>
+          <button class="width-btn" data-width="full">96%</button>
+        </div>
+      </div>
+
+      <div id="spacingControlsGroup" class="settings-group">
+        <div class="settings-label" style="display:flex; justify-content:space-between;">
+          <span>TYPE SIZE</span>
+          <span id="fontSizeLabel" style="font-family: var(--font-mono);">100%</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:4px;">
+          <button id="fontDecBtn" class="btn btn-secondary btn-sm" style="flex:1;">A−</button>
+          <button id="fontIncBtn" class="btn btn-secondary btn-sm" style="flex:1;">A+</button>
+        </div>
+
+        <div style="margin-top:6px;">
+          <div class="settings-label">WORD SPACING</div>
+          <input type="range" id="wordSpacingSlider" class="range-slider" min="0" max="8" step="0.5" value="0">
+        </div>
+
+        <div style="margin-top:6px;">
+          <div class="settings-label">LETTER SPACING</div>
+          <input type="range" id="letterSpacingSlider" class="range-slider" min="0" max="4" step="0.1" value="0">
+        </div>
       </div>
     </div>
 
-    <div id="readerStatus" style="font-size: 12px; color: #666; margin: 6px 0;">Ready</div>
+  </div>
 
-    <!-- Reader Frame Container with Loading Overlay -->
-    <div id="readerFrame" style="position: relative; width: 85; height: 100vh; border: 1px solid #ccc; background: #ffffff; margin: 2px auto 0;">
-      <!-- Loading Overlay with Spinner -->
-      <div id="loadingOverlay" style="display: none;">
-        <div style="display: flex; align-items: center; margin-bottom: 8px;">
-          <div class="spinner"></div>
-          <strong id="loadingTitle">Initializing Kookit...</strong>
-        </div>
-        <div id="loadingDetail" style="font-size: 13px; color: #666;">Downloading and preparing book rendition...</div>
+  <!-- =========================================================================
+       MODALS & NOTIFICATIONS
+       ========================================================================= -->
+  
+  <!-- Storage & Cache Manager Modal -->
+  <div id="storageModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">ARCHIVE STORAGE STATUS</h3>
+        <button id="storageModalCloseBtn" class="btn btn-ghost btn-sm btn-icon">✕</button>
       </div>
-
-      <!-- Kookit Iframe Container (id MUST be page-area for Kookit) -->
-      <div id="page-area" style="width: 100%; height: 100%; position: relative; overflow: hidden;"></div>
-
-      <!-- Footnote Popup -->
-      <div id="footnoteBackdrop" style="display:none; position:absolute; inset:0; z-index:50; background:rgba(0,0,0,0.18);" onclick="closeFootnotePopup()"></div>
-      <div id="footnotePopup" role="dialog" aria-label="Footnote" style="display:none; position:absolute; z-index:51; width:340px; max-height:50vh; background:#fff; border:1px solid #ccc; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.22); overflow:hidden;">
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; border-bottom:1px solid #eee; font-size:13px; color:#666;">
-          <span>Footnote</span>
-          <button id="footnoteCloseBtn" aria-label="Close footnote" onclick="closeFootnotePopup()" style="border:none; background:none; cursor:pointer; font-size:14px; color:#999; padding:0 4px;">✕</button>
-        </div>
-        <div id="footnoteContent" style="padding:10px 12px; font-size:14px; line-height:1.55; color:#333; overflow-y:auto; max-height:calc(50vh - 36px);"></div>
+      <div id="storageModalBody" class="modal-body">
+        <div class="spinner" style="margin:20px auto;"></div>
+      </div>
+      <div class="modal-footer">
+        <button id="modalClearCacheBtn" class="btn btn-danger btn-sm">PURGE ALL LOCAL CACHE</button>
       </div>
     </div>
   </div>
 
-  <script>
-    let currentFolderId = null;
-    let currentRendition = null;
-    let currentBookData = null;
-    let currentReaderMode = 'single';
-    let currentPdfZoom = 1;
-    let currentWordSpacing = 0;
-    let currentLetterSpacing = 0;
-    let currentFontSize = 1;
-    let __crumbs = [];
-    let __savePosTimer = null;
-    let __building = false;
-
-    function log(msg) {
-      const box = document.getElementById('logBox');
-      const time = new Date().toLocaleTimeString();
-      box.textContent = `[${time}] ${msg}\n` + box.textContent;
-    }
-
-    function showLoading(title, detail = '') {
-      const overlay = document.getElementById('loadingOverlay');
-      const titleEl = document.getElementById('loadingTitle');
-      const detailEl = document.getElementById('loadingDetail');
-      if (overlay) overlay.style.display = 'flex';
-      if (titleEl) titleEl.textContent = title;
-      if (detailEl) detailEl.textContent = detail;
-    }
-
-    function hideLoading() {
-      const overlay = document.getElementById('loadingOverlay');
-      if (overlay) overlay.style.display = 'none';
-    }
-
-    // ---- Footnote Popup ----
-
-    function positionFootnotePopup(iframe, evt) {
-      const popup = document.getElementById('footnotePopup');
-      const frame = document.getElementById('readerFrame');
-      if (!popup || !frame) return;
-      const frameRect = frame.getBoundingClientRect();
-      const iframeRect = iframe.getBoundingClientRect();
-      const x = iframeRect.left + evt.clientX;
-      const y = iframeRect.top + evt.clientY;
-      const pw = popup.offsetWidth || 340;
-      const ph = popup.offsetHeight;
-      let left = x + 14;
-      let top = y + 14;
-      if (left + pw > frameRect.right - 8) left = x - pw - 14;
-      left = Math.max(frameRect.left + 8, Math.min(left, frameRect.right - pw - 8));
-      if (top + ph > frameRect.bottom - 8) top = y - ph - 14;
-      top = Math.max(frameRect.top + 8, Math.min(top, frameRect.bottom - ph - 8));
-      popup.style.left = left + 'px';
-      popup.style.top = top + 'px';
-    }
-
-    function showFootnotePopup(html, iframe, evt) {
-      const popup = document.getElementById('footnotePopup');
-      const backdrop = document.getElementById('footnoteBackdrop');
-      const contentEl = document.getElementById('footnoteContent');
-      const closeBtn = document.getElementById('footnoteCloseBtn');
-      if (!popup || !contentEl) return;
-      contentEl.innerHTML = html;
-      popup.style.display = 'block';
-      if (backdrop) backdrop.style.display = 'block';
-      positionFootnotePopup(iframe, evt);
-      if (closeBtn) closeBtn.focus();
-    }
-
-    function closeFootnotePopup() {
-      const popup = document.getElementById('footnotePopup');
-      const backdrop = document.getElementById('footnoteBackdrop');
-      if (popup) popup.style.display = 'none';
-      if (backdrop) backdrop.style.display = 'none';
-    }
-
-    function isFootnoteOpen() {
-      const popup = document.getElementById('footnotePopup');
-      return popup && popup.style.display !== 'none';
-    }
-
-    // 1. System & Connection Status
-    async function loadStatus() {
-      try {
-        const res = await fetch('/api/status');
-        const data = await res.json();
-        if (data.success) {
-          const s = data.data;
-          document.getElementById('driveStatus').textContent = s.connected
-            ? (s.keyDetected ? 'Connected (Key detected)' : 'Connected (No key found)')
-            : 'Disconnected';
-
-          const rootName = s.rootFolder.name || 'Archive Folder';
-          const rootId = s.rootFolder.id || 'N/A';
-          const access = s.rootFolder.accessible ? 'Accessible' : (s.rootFolder.error || 'Pending');
-          document.getElementById('folderInfo').textContent = `${rootName} (${rootId}) - ${access}`;
-
-          document.getElementById('syncStats').textContent = `${s.stats.totalBooks} books (${s.stats.totalSizeFormatted}), ${s.stats.totalFolders} folders`;
-          document.getElementById('lastSync').textContent = s.lastSyncTime ? new Date(s.lastSyncTime).toLocaleString() : 'Never';
-          document.getElementById('cacheStats').textContent = `${s.cacheStats.count} books cached (${s.cacheStats.totalBytesFormatted})`;
-        } else {
-          log('Status error: ' + data.error);
-        }
-      } catch (err) {
-        log('Connection error: ' + err.message);
-      }
-    }
-
-    // 2. Load Folder Files
-    async function loadFiles(folderId = currentFolderId) {
-      try {
-        const url = folderId ? `/api/files?folderId=${encodeURIComponent(folderId)}` : '/api/files';
-        const res = await fetch(url);
-        const data = await res.json();
-
-        if (!data.success) {
-          log('Error loading files: ' + data.error);
-          return;
-        }
-
-        currentFolderId = data.data.currentFolder?.id || null;
-        renderBreadcrumbs(data.data.breadcrumbs);
-        renderLists(data.data.folders, data.data.books);
-      } catch (err) {
-        log('Error: ' + err.message);
-      }
-    }
-
-    function renderBreadcrumbs(crumbs = []) {
-      __crumbs = crumbs || [];
-      const el = document.getElementById('breadcrumbs');
-      const backBtn = document.getElementById('backBtn');
-      if (backBtn) backBtn.style.display = (__crumbs.length >= 2) ? 'inline-block' : 'none';
-      if (!crumbs || crumbs.length === 0) {
-        el.textContent = 'Archive Root';
-        return;
-      }
-      el.innerHTML = crumbs.map((c, i) => {
-        if (i === crumbs.length - 1) return `<strong>${c.name}</strong>`;
-        return `<a href="#" onclick="loadFiles('${c.id}'); return false;">${c.name}</a> / `;
-      }).join('');
-    }
-
-    function goBack() {
-      if (__crumbs.length < 2) return;
-      const parent = __crumbs[__crumbs.length - 2];
-      loadFiles(parent ? parent.id : null);
-    }
-
-    function renderLists(folders = [], books = []) {
-      const folderList = document.getElementById('folderList');
-      const bookList = document.getElementById('bookList');
-
-      folderList.innerHTML = '';
-      bookList.innerHTML = '';
-
-      if (folders.length === 0) {
-        folderList.innerHTML = '<li>(No subfolders)</li>';
-      } else {
-        folders.forEach(f => {
-          const li = document.createElement('li');
-          li.innerHTML = `📁 <a href="#" onclick="loadFiles('${f.id}'); return false;"><strong>${f.name}</strong></a>`;
-          folderList.appendChild(li);
-        });
-      }
-
-      if (books.length === 0) {
-        bookList.innerHTML = '<li>(No books in this folder)</li>';
-      } else {
-        books.forEach(b => {
-          const li = document.createElement('li');
-          const cacheText = b.cached ? `[Cached: ${b.cachedSizeFormatted}]` : '[Cloud Only]';
-          li.innerHTML = `
-            📄 [${b.format}] <strong>${b.name}</strong> - ${b.sizeFormatted || '0 B'} - <em>${cacheText}</em>
-            <button onclick="readBook('${b.id}', '${escapeQuotes(b.name)}', '${b.format}')">📖 Read (Kookit)</button>
-            ${b.cached ? `<button onclick="deleteCache('${b.id}')">Delete Cache</button>` : ''}
-          `;
-          bookList.appendChild(li);
-        });
-      }
-    }
-
-    function escapeQuotes(str) {
-      return (str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-    }
-
-    // 3. Manual Sync
-    async function triggerSync() {
-      const btn = document.getElementById('syncBtn');
-      btn.disabled = true;
-      btn.textContent = 'Syncing...';
-      log('Starting Google Drive sync...');
-
-      try {
-        const res = await fetch('/api/sync', { method: 'POST' });
-        const data = await res.json();
-        if (data.success) {
-          log(`Sync complete in ${data.data.durationMs}ms: ${data.data.stats.totalBooks} books, ${data.data.stats.totalFolders} folders.`);
-          if (data.data.diff) {
-            log(`Diff: +${data.data.diff.newBooksCount} new books, -${data.data.diff.removedBooksCount} removed books.`);
-          }
-        } else {
-          log('Sync failed: ' + data.error);
-        }
-      } catch (err) {
-        log('Sync error: ' + err.message);
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Sync with Google Drive';
-        await loadStatus();
-        await loadFiles(currentFolderId);
-      }
-    }
-
-    // 4. Read / Cache Book with Kookit Integration
-    async function readBook(fileId, bookName, bookFormat = 'EPUB') {
-      if (window.__kookitReady) await window.__kookitReady;
-      log(`Opening book: "${bookName}" (${fileId})...`);
-      document.getElementById('libraryView').style.display = 'none';
-      document.getElementById('readerView').style.display = 'block';
-
-      document.getElementById('readerBookTitle').textContent = bookName;
-      document.getElementById('readerBookFormat').textContent = `[${bookFormat}]`;
-
-      currentPdfZoom = 1;
-      updatePdfZoomLabel();
-      togglePdfZoomControls(bookFormat.toUpperCase());
-      toggleSpacingControls(bookFormat.toUpperCase());
-      loadSpacingSettings();
-      const frame = document.getElementById('readerFrame');
-      if (frame) frame.style.width = '60vw';
-
-      const pageArea = document.getElementById('page-area');
-      pageArea.innerHTML = '';
-
-      // Show initial loading icon overlay
-      showLoading('Fetching book data...', 'Downloading / verifying local cache...');
-
-      try {
-        const startTime = Date.now();
-        const res = await fetch(`/api/book/${fileId}/stream`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-
-        const source = res.headers.get('X-Cache-Source') || 'stream';
-        const buffer = await res.arrayBuffer();
-        const fetchDuration = Date.now() - startTime;
-        log(`Book retrieved (${source}) in ${fetchDuration}ms (${(buffer.byteLength / 1024 / 1024).toFixed(2)} MB).`);
-
-        currentBookData = {
-          fileId,
-          name: bookName,
-          format: bookFormat,
-          buffer
-        };
-
-        await buildRendition({});
-
-        const totalDuration = Date.now() - startTime;
-        log(`Book "${bookName}" ready in ${totalDuration}ms.`);
-      } catch (err) {
-        log(`Error reading with Kookit: ${err.message}`);
-        __building = false;
-        showLoading('Failed to open book', err.message);
-        setTimeout(hideLoading, 4000);
-      }
-    }
-
-    // Build (or rebuild) the Kookit rendition from the in-memory book buffer.
-    // Reused by zoom to re-layout a PDF without refetching from the server.
-    async function buildRendition(overrides = {}) {
-      if (!currentBookData) throw new Error('No book data loaded.');
-      const { fileId, name, format, buffer } = currentBookData;
-
-      __building = true;
-      showLoading('Initializing Kookit engine...', `Parsing ${format} metadata and structure...`);
-
-      if (!window.Kookit) {
-        throw new Error('Kookit library is not loaded.');
-      }
-
-      window.transMap = window.transMap || {};
-
-      const config = Object.assign({
-        format: format.toUpperCase(),
-        readerMode: currentReaderMode,
-        animation: 'none',
-        charset: 'utf-8',
-        isDarkMode: 'no',
-        convertChinese: 'no',
-        isConvertPDF: 'no',
-        isMobile: 'no',
-        backgroundColor: '#ffffff'
-      }, overrides);
-
-      // Create Rendition instance
-      let rendition = null;
-      if (window.Kookit.BookHelper && typeof window.Kookit.BookHelper.getRendition === 'function') {
-        rendition = window.Kookit.BookHelper.getRendition(buffer, config, window.Kookit);
-      } else {
-        const fmt = format.toUpperCase();
-        if (fmt === 'EPUB' && window.Kookit.EpubRender) {
-          rendition = new window.Kookit.EpubRender(buffer, config);
-        } else if ((fmt === 'MOBI' || fmt === 'AZW3' || fmt === 'AZW') && window.Kookit.MobiRender) {
-          rendition = new window.Kookit.MobiRender(buffer, config);
-        } else if (fmt === 'PDF' && window.Kookit.PdfRender) {
-          rendition = new window.Kookit.PdfRender(buffer, config);
-        } else if (fmt === 'TXT' && window.Kookit.TxtRender) {
-          rendition = new window.Kookit.TxtRender(buffer, config);
-        } else if (fmt === 'MD' && window.Kookit.MdRender) {
-          rendition = new window.Kookit.MdRender(buffer, config);
-        }
-      }
-
-      if (!rendition) {
-        throw new Error(`No compatible Kookit renderer for format: ${format}`);
-      }
-
-      currentRendition = rendition;
-      window.rendition = rendition;
-
-      const pageArea = document.getElementById('page-area');
-      // Scroll mode scrolls the page-area container itself; it needs scrollable overflow.
-      pageArea.style.overflowY = (currentReaderMode === 'scroll') ? 'auto' : 'hidden';
-
-      // Keep the previous build's iframe alive in a hidden container instead of
-      // destroying it here. Kookit's PDF prerenders run without await; if the
-      // iframe died mid-render, they would crash on the dead document and the
-      // position restore could fail. The old build is removed after it settles.
-      const prevFrame = pageArea.querySelector('iframe');
-      const limbo = document.createElement('div');
-      limbo.style.display = 'none';
-      document.body.appendChild(limbo);
-      if (prevFrame) {
-        limbo.appendChild(prevFrame);
-        setTimeout(() => limbo.remove(), 5000);
-      } else {
-        limbo.remove();
-      }
-      pageArea.innerHTML = '';
-
-      showLoading('Rendering chapter...', 'Injecting iframe layout and styles...');
-
-      // 1. Render layout to container
-      await rendition.renderTo(pageArea);
-
-      // Intercept link clicks inside the epub iframe for footnotes and navigation
-      const epubDoc = rendition.getDocument();
-      const epubIframe = rendition.getIframe();
-      if (epubDoc && epubIframe && !epubDoc.__kookitClickAttached) {
-        epubDoc.__kookitClickAttached = true;
-        epubDoc.addEventListener('click', async (e) => {
-          try {
-            // Close footnote popup when clicking outside of it
-            if (isFootnoteOpen() && !e.target.closest('#footnotePopup')) {
-              closeFootnotePopup();
-            }
-
-            // Intercept epub links (footnotes, chapter jumps, anchors)
-            const href = rendition.getTargetHref ? rendition.getTargetHref(e) : '';
-            if (!href) return;
-            e.preventDefault();
-            e.stopPropagation();
-            const result = await rendition.handleLinkJump(href, e);
-            if (!result || !result.handled) return;
-            if (result.external) {
-              if (result.href) window.open(result.href, '_blank', 'noopener');
-              return;
-            }
-            if (result.isShowMenu && result.node && typeof rendition.getFootnoteContent === 'function') {
-              const foot = await rendition.getFootnoteContent(result.node);
-              if (foot && foot.handled && foot.content) {
-                showFootnotePopup(foot.content, epubIframe, e);
-                return;
-              }
-            }
-            // In-chapter anchor links: handleLinkJump skips scroll for same-doc #anchors.
-            // Replicate the browser's native anchor scroll that preventDefault() removed.
-            if (result.handled && href.indexOf('#') === 0 && epubDoc) {
-              const id = href.split('#')[1];
-              const node = id ? epubDoc.body.querySelector('#' + CSS.escape(id)) : null;
-              if (node && typeof rendition.goToNode === 'function') {
-                await rendition.goToNode(node);
-              }
-            }
-          } catch (err) {
-            log('Link error: ' + err.message);
-            // Fallback: try to resolve and jump to the chapter ourselves
-            try {
-              if (href && rendition.resolveChapter && rendition.goToChapter) {
-                const ch = rendition.resolveChapter(href);
-                if (ch) await rendition.goToChapter(ch.index, ch.href, ch.label);
-              }
-            } catch (_) {}
-          }
-        });
-      }
-
-      // 2. Display the first chapter immediately
-      if (rendition.chapterDocList && rendition.chapterDocList.length > 0) {
-        await rendition.goToChapterDocIndex(0);
-      } else if (typeof rendition.goToChapter === 'function') {
-        await rendition.goToChapter(0);
-      }
-
-      // 3. Populate Table of Contents
-      await populateChapters(rendition);
-
-      // 4. Update status events
-      const statusEl = document.getElementById('readerStatus');
-      statusEl.textContent = 'Book loaded and ready.';
-
-      if (rendition.on) {
-        rendition.on('rendered', () => {
-          statusEl.textContent = 'Page rendered.';
-          // After the iframe body has its final height, reset vertical scroll to top.
-          // handleRenderChapter resets scrollTo(0,0) before images finish loading,
-          // so the scroll can drift once handleIframeHeight resizes the body.
-          // A microtask delay ensures the body dimensions are settled.
-          setTimeout(() => {
-            try {
-              const doc = rendition.getDocument();
-              if (doc && doc.body) doc.body.scrollTop = 0;
-              if (currentReaderMode === 'scroll') {
-                const pa = document.getElementById('page-area');
-                if (pa) pa.scrollTop = 0;
-              }
-            } catch (_) {}
-          }, 50);
-        });
-        rendition.on('page-changed', async () => {
-          if (typeof rendition.getPosition === 'function') {
-            const pos = rendition.getPosition();
-            statusEl.textContent = `Chapter ${pos?.chapterDocIndex ?? 0}`;
-            saveReadingPosition();
-          }
-          if (currentReaderMode === 'single' || currentReaderMode === 'double') {
-            const resetScroll = () => {
-              window.scrollTo(0, 0);
-              document.documentElement.scrollTop = 0;
-              document.body.scrollTop = 0;
-              const pa = document.getElementById('page-area');
-              if (pa) pa.scrollTop = 0;
-              try {
-                const doc = rendition.getDocument();
-                if (doc && doc.body) doc.body.scrollTop = 0;
-              } catch (_) {}
-            };
-            resetScroll();
-            setTimeout(resetScroll, 50);
-          }
-        });
-      }
-
-      // Scroll to the very top of the new chapter before restoring any saved position.
-      // In single/double mode the scroll lives on the iframe body; in scroll mode on page-area.
-      const _epubDoc = rendition.getDocument();
-      const _epubFrame = rendition.getIframe();
-      if (_epubDoc && _epubDoc.body) _epubDoc.body.scrollTop = 0;
-      if (currentReaderMode === 'scroll') {
-        pageArea.scrollTop = 0;
-      }
-
-      // 5. Restore the saved reading position (if any), persist it, then hide
-      await restoreReadingPosition();
-      __building = false;
-      saveReadingPositionNow();
-      applySpacing();
-      hideLoading();
-    }
-
-    // ---- Reading position persistence (survives cache clear: stored in localStorage) ----
-
-    function saveReadingPositionNow() {
-      if (__building) return;
-      if (!currentBookData || !currentRendition) return;
-      if (typeof currentRendition.getPosition !== 'function') return;
-      try {
-        localStorage.setItem('eonz.reading.' + currentBookData.fileId, JSON.stringify(currentRendition.getPosition()));
-      } catch (e) {
-        console.warn('Could not save reading position:', e);
-      }
-    }
-
-    function saveReadingPosition() {
-      if (__savePosTimer) clearTimeout(__savePosTimer);
-      __savePosTimer = setTimeout(saveReadingPositionNow, 300);
-    }
-
-    async function restoreReadingPosition() {
-      if (!currentBookData || !currentRendition) return;
-      if (typeof currentRendition.goToPosition !== 'function') return;
-      const saved = localStorage.getItem('eonz.reading.' + currentBookData.fileId);
-      if (!saved) return;
-      try {
-        const pos = JSON.parse(saved);
-        if (pos && (pos.chapterDocIndex !== undefined || pos.xpath || pos.href)) {
-          await currentRendition.goToPosition(saved);
-        }
-      } catch (e) {
-        console.warn('Could not restore reading position:', e);
-      }
-    }
-
-    // ---- PDF zoom ----
-    // Kookit fits PDF pages to the container width and height at render time, so
-    // zoom is done by scaling the reader frame (width and height) and rebuilding
-    // the rendition from the buffer.
-
-    function togglePdfZoomControls(format) {
-      const el = document.getElementById('pdfZoomControls');
-      if (el) el.style.display = (format === 'PDF') ? 'inline-block' : 'none';
-    }
-
-    function updatePdfZoomLabel() {
-      const el = document.getElementById('pdfZoomLabel');
-      if (el) el.textContent = Math.round(currentPdfZoom * 100) + '%';
-    }
-
-    async function applyPdfZoom(nextZoom) {
-      currentPdfZoom = Math.min(3, Math.max(0.5, nextZoom));
-      updatePdfZoomLabel();
-      const frame = document.getElementById('readerFrame');
-      if (frame) {
-        frame.style.width = (60 * currentPdfZoom) + 'vw';
-        frame.style.height = (100 * currentPdfZoom) + 'vh';
-      }
-      if (!currentRendition) return;
-      saveReadingPositionNow();
-      try {
-        await buildRendition({});
-      } catch (e) {
-        log('PDF zoom failed: ' + e.message);
-      }
-    }
-
-    async function zoomPdf(factor) {
-      if (!currentBookData || currentBookData.format.toUpperCase() !== 'PDF') return;
-      await applyPdfZoom(currentPdfZoom * factor);
-    }
-
-    async function resetPdfZoom() {
-      if (!currentBookData || currentBookData.format.toUpperCase() !== 'PDF') return;
-      await applyPdfZoom(1);
-    }
-
-    // ---- Word / letter spacing (reflowable formats) ----
-    // The chapter content lives in the outer kookit iframe document, so a style
-    // element injected into that document's head applies to every chapter.
-
-    function toggleSpacingControls(format) {
-      const el = document.getElementById('spacingControls');
-      if (el) el.style.display = (format === 'PDF' || format === 'COMIC') ? 'none' : 'inline-block';
-    }
-
-    function loadSpacingSettings() {
-      currentWordSpacing = parseFloat(localStorage.getItem('eonz.spacing.word') || '0');
-      currentLetterSpacing = parseFloat(localStorage.getItem('eonz.spacing.letter') || '0');
-      currentFontSize = parseFloat(localStorage.getItem('eonz.spacing.font') || '1');
-      if (isNaN(currentWordSpacing)) currentWordSpacing = 0;
-      if (isNaN(currentLetterSpacing)) currentLetterSpacing = 0;
-      if (isNaN(currentFontSize) || currentFontSize <= 0) currentFontSize = 1;
-      const ws = document.getElementById('wordSpacingSlider');
-      const ls = document.getElementById('letterSpacingSlider');
-      if (ws) ws.value = String(currentWordSpacing);
-      if (ls) ls.value = String(currentLetterSpacing);
-      updateFontSizeLabel();
-    }
-
-    function updateFontSizeLabel() {
-      const el = document.getElementById('fontSizeLabel');
-      if (el) el.textContent = Math.round(currentFontSize * 100) + '%';
-    }
-
-    function changeFontSize(dir) {
-      currentFontSize = Math.min(3, Math.max(0.5, currentFontSize + dir * 0.1));
-      localStorage.setItem('eonz.spacing.font', String(currentFontSize));
-      updateFontSizeLabel();
-      applySpacing();
-    }
-
-    function applySpacing() {
-      if (!currentRendition || typeof currentRendition.getDocument !== 'function') return;
-      const doc = currentRendition.getDocument();
-      if (!doc || !doc.head) return;
-      let style = doc.getElementById('kookit-spacing-style');
-      if (!style) {
-        style = doc.createElement('style');
-        style.id = 'kookit-spacing-style';
-        doc.head.appendChild(style);
-      }
-      style.textContent = `body * { word-spacing: ${currentWordSpacing}px !important; letter-spacing: ${currentLetterSpacing}px !important; font-size: ${Math.round(currentFontSize * 100)}% !important; }`;
-    }
-
-    function changeWordSpacing(value) {
-      currentWordSpacing = parseFloat(value) || 0;
-      localStorage.setItem('eonz.spacing.word', String(currentWordSpacing));
-      applySpacing();
-    }
-
-    function changeLetterSpacing(value) {
-      currentLetterSpacing = parseFloat(value) || 0;
-      localStorage.setItem('eonz.spacing.letter', String(currentLetterSpacing));
-      applySpacing();
-    }
-
-    async function populateChapters(rendition) {
-      const chapterSelect = document.getElementById('chapterSelect');
-      chapterSelect.innerHTML = '<option value="">Table of Contents</option>';
-
-      try {
-        let chapters = [];
-        if (typeof rendition.getChapter === 'function') {
-          chapters = await rendition.getChapter() || [];
-        } else if (rendition.chapterList) {
-          chapters = rendition.chapterList;
-        }
-
-        if (chapters && chapters.length > 0) {
-          chapters.forEach((ch, idx) => {
-            const opt = document.createElement('option');
-            opt.value = ch.index !== undefined ? ch.index : idx;
-            opt.textContent = ch.label || `Chapter ${idx + 1}`;
-            chapterSelect.appendChild(opt);
-          });
-        }
-      } catch (e) {
-        console.warn('Could not populate chapters:', e);
-      }
-    }
-
-    function jumpToChapter(index) {
-      closeFootnotePopup();
-      if (!currentRendition || index === '') return;
-      if (typeof currentRendition.goToChapter === 'function') {
-        currentRendition.goToChapter(parseInt(index, 10));
-      }
-    }
-
-    function nextPage() {
-      if (isFootnoteOpen()) { closeFootnotePopup(); return; }
-      if (currentRendition && typeof currentRendition.next === 'function') {
-        currentRendition.next();
-      }
-    }
-
-    function prevPage() {
-      if (isFootnoteOpen()) { closeFootnotePopup(); return; }
-      if (currentRendition && typeof currentRendition.prev === 'function') {
-        currentRendition.prev();
-      }
-    }
-
-    function changeReaderMode(mode) {
-      closeFootnotePopup();
-      currentReaderMode = mode;
-      if (currentBookData) {
-        readBook(currentBookData.fileId, currentBookData.name, currentBookData.format);
-      }
-    }
-
-    function closeReader() {
-      closeFootnotePopup();
-      saveReadingPositionNow();
-      document.getElementById('readerView').style.display = 'none';
-      document.getElementById('libraryView').style.display = 'block';
-      const pageArea = document.getElementById('page-area');
-      if (pageArea) pageArea.innerHTML = '';
-      currentRendition = null;
-      hideLoading();
-      loadStatus();
-      loadFiles(currentFolderId);
-    }
-
-    window.addEventListener('beforeunload', saveReadingPositionNow);
-
-    // Keyboard navigation (Left / Right arrow keys)
-    window.addEventListener('keydown', (e) => {
-      if (document.getElementById('readerView').style.display !== 'none') {
-        if (e.key === 'ArrowRight' || e.key === 'PageDown') {
-          nextPage();
-        } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-          prevPage();
-        } else if (e.key === 'Escape') {
-          if (isFootnoteOpen()) { closeFootnotePopup(); } else { closeReader(); }
-        }
-      }
-    });
-
-    // 5. Cache Management
-    async function deleteCache(fileId) {
-      try {
-        const res = await fetch(`/api/book/${fileId}/cache`, { method: 'DELETE' });
-        const data = await res.json();
-        if (data.success) {
-          log(`Cache cleared for ${fileId}`);
-          await loadStatus();
-          await loadFiles(currentFolderId);
-        }
-      } catch (err) {
-        log('Error deleting cache: ' + err.message);
-      }
-    }
-
-    async function clearAllCache() {
-      if (!confirm('Clear all cached books from disk?')) return;
-      try {
-        const res = await fetch('/api/cache', { method: 'DELETE' });
-        const data = await res.json();
-        if (data.success) {
-          log(`All cache cleared (${data.data?.count ?? 0} files removed).`);
-        } else {
-          log('Clear cache failed: ' + data.error);
-        }
-      } catch (err) {
-        log('Clear cache error: ' + err.message);
-      } finally {
-        await loadStatus();
-        await loadFiles(currentFolderId);
-      }
-    }
-
-    // Initialize on page load
-    loadStatus();
-    loadFiles();
-  </script>
+  <!-- Keyboard Shortcuts Modal -->
+  <div id="shortcutsModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">KEYBOARD SHORTCUTS</h3>
+        <button id="shortcutsModalCloseBtn" class="btn btn-ghost btn-sm btn-icon">✕</button>
+      </div>
+      <div class="modal-body">
+        <table style="width:100%; border-collapse:collapse; font-size:12.5px; font-family: var(--font-mono);">
+          <tr style="border-bottom:1px solid var(--border-subtle);">
+            <td style="padding:8px 0; color:var(--text-secondary);">Next Page / Spread</td>
+            <td style="padding:8px 0; text-align:right;">[ → ] / [ PageDown ] / [ Space ]</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border-subtle);">
+            <td style="padding:8px 0; color:var(--text-secondary);">Previous Page / Spread</td>
+            <td style="padding:8px 0; text-align:right;">[ ← ] / [ PageUp ]</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border-subtle);">
+            <td style="padding:8px 0; color:var(--text-secondary);">Close Reader / Dismiss</td>
+            <td style="padding:8px 0; text-align:right;">[ Esc ]</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0; color:var(--text-secondary);">Keybindings Guide</td>
+            <td style="padding:8px 0; text-align:right;">[ ? ]</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer"></div>
+
+  <!-- Application Logic Scripts -->
+  <script src="/js/api.js"></script>
+  <script src="/js/state.js"></script>
+  <script src="/js/library.js"></script>
+  <script src="/js/reader.js"></script>
+  <script src="/js/main.js"></script>
 </body>
 </html>

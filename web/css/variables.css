@@ -1,0 +1,190 @@
+/* ==========================================================================
+   EONZARCHIVE - SWISS MINIMALIST & OLD ARCHIVE DESIGN TOKENS
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Crimson+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Font Families - Classical Archival & Swiss Typography */
+  --font-serif: 'EB Garamond', 'Cormorant Garamond', Georgia, serif;
+  --font-heading: 'EB Garamond', 'Cormorant Garamond', Georgia, serif;
+  --font-body: 'Crimson Pro', Georgia, serif;
+  --font-ui: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Strict Swiss Minimalist Rule: NO ROUNDED CORNERS */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-full: 0px;
+
+  /* Spacing Scale */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+  --space-3xl: 48px;
+
+  /* Transitions */
+  --transition-fast: 120ms ease;
+  --transition-normal: 200ms ease;
+}
+
+/* ==========================================================================
+   DARK THEME: CHARCOAL, SLATE STONE & MUTED STEEL
+   ========================================================================== */
+[data-theme="dark"] {
+  --bg-app: #101214;
+  --bg-surface: #171a1d;
+  --bg-surface-elevated: #1e2226;
+  --bg-surface-subtle: #141619;
+  --bg-hover: #24292f;
+  --bg-input: #14171a;
+
+  --border-subtle: #252a30;
+  --border-medium: #333a42;
+  --border-strong: #49535e;
+  --border-focus: #8b99a8;
+
+  --text-primary: #eceff2;
+  --text-secondary: #9da7b3;
+  --text-muted: #677280;
+  --text-inverse: #101214;
+
+  --brand-primary: #7d8e9e;
+  --brand-primary-hover: #96a5b3;
+  --brand-accent: #6b7d8d;
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: 0 4px 20px rgba(0, 0, 0, 0.5);
+
+  /* Muted Archival Format Badges */
+  --badge-epub-bg: #1c2420;
+  --badge-epub-text: #8bb89e;
+  --badge-epub-border: #2d3d34;
+
+  --badge-pdf-bg: #271f21;
+  --badge-pdf-text: #b88b8e;
+  --badge-pdf-border: #422f33;
+
+  --badge-mobi-bg: #26231d;
+  --badge-mobi-text: #b8a68b;
+  --badge-mobi-border: #3d362b;
+
+  --badge-txt-bg: #1d2228;
+  --badge-txt-text: #8fa0b5;
+  --badge-txt-border: #2c3642;
+
+  --badge-md-bg: #222026;
+  --badge-md-text: #aa97b8;
+  --badge-md-border: #383242;
+
+  /* Archival Cover Backgrounds (Muted Charcoal & Slate, strictly non-sepia) */
+  --spine-1: #1a1e22;
+  --spine-2: #1e2329;
+  --spine-3: #181d24;
+  --spine-4: #20242a;
+  --spine-5: #16191d;
+}
+
+/* ==========================================================================
+   LIGHT THEME: BONE, LIMESTONE, ASH & ASHEN PARCHMENT
+   ========================================================================== */
+[data-theme="light"] {
+  --bg-app: #f5f5f2;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #fafaf8;
+  --bg-surface-subtle: #eaeae6;
+  --bg-hover: #ebebe7;
+  --bg-input: #ffffff;
+
+  --border-subtle: #deded9;
+  --border-medium: #c8c8c2;
+  --border-strong: #9e9e96;
+  --border-focus: #4b5563;
+
+  --text-primary: #181a1c;
+  --text-secondary: #585e66;
+  --text-muted: #8c929a;
+  --text-inverse: #ffffff;
+
+  --brand-primary: #3d464f;
+  --brand-primary-hover: #262d34;
+  --brand-accent: #525f6c;
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08);
+
+  /* Muted Archival Format Badges */
+  --badge-epub-bg: #eef4f0;
+  --badge-epub-text: #3e6e52;
+  --badge-epub-border: #c2d8cb;
+
+  --badge-pdf-bg: #f7eff0;
+  --badge-pdf-text: #784347;
+  --badge-pdf-border: #dec0c3;
+
+  --badge-mobi-bg: #f6f3ed;
+  --badge-mobi-text: #735e38;
+  --badge-mobi-border: #dcd2bf;
+
+  --badge-txt-bg: #eef2f7;
+  --badge-txt-text: #415a77;
+  --badge-txt-border: #c3d2e3;
+
+  --badge-md-bg: #f3eff6;
+  --badge-md-text: #5e4871;
+  --badge-md-border: #d5c8de;
+
+  /* Archival Cover Backgrounds */
+  --spine-1: #e9e9e4;
+  --spine-2: #e4e6e2;
+  --spine-3: #dfe2e5;
+  --spine-4: #eceae5;
+  --spine-5: #eae7e3;
+}
+
+/* ==========================================================================
+   READER MODES: MUTED BONE / CHARCOAL / WHITE / OLED (NO RED-BROWN)
+   ========================================================================== */
+
+[data-reader-theme="dark"] {
+  --reader-surface: #171a1d;
+  --reader-frame-bg: #171a1d;
+  --reader-text: #eceff2;
+  --reader-text-muted: #8c96a3;
+  --reader-border: #2a3038;
+  --reader-toolbar-bg: #171a1d;
+}
+
+[data-reader-theme="bone"] {
+  --reader-surface: #f4f4f0;
+  --reader-frame-bg: #f4f4f0;
+  --reader-text: #1f2226;
+  --reader-text-muted: #636a73;
+  --reader-border: #d0d0c8;
+  --reader-toolbar-bg: #f4f4f0;
+}
+
+[data-reader-theme="light"] {
+  --reader-surface: #ffffff;
+  --reader-frame-bg: #ffffff;
+  --reader-text: #181a1c;
+  --reader-text-muted: #5e646d;
+  --reader-border: #deded9;
+  --reader-toolbar-bg: #ffffff;
+}
+
+[data-reader-theme="oled"] {
+  --reader-surface: #000000;
+  --reader-frame-bg: #000000;
+  --reader-text: #d8dbe0;
+  --reader-text-muted: #717782;
+  --reader-border: #1a1a1a;
+  --reader-toolbar-bg: #000000;
+}
