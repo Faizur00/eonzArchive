@@ -201,7 +201,11 @@ const Reader = {
     if (overlay) overlay.style.display = 'none';
   },
 
-  async openBook(fileId, bookName, format = 'EPUB') {
+  async openBook(fileId, bookName, format = 'EPUB', updateUrl = true) {
+    if (updateUrl && window.Router) {
+      Router.navigate(`/read/${fileId}`);
+    }
+
     if (window.__kookitReady) await window.__kookitReady;
     
     document.getElementById('libraryView').style.display = 'none';
@@ -670,6 +674,22 @@ const Reader = {
     this.toggleTOC(false);
     this.savePositionNow();
 
+    if (window.location.hash.startsWith('#/read/')) {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        Router.navigate(State.currentFolderId ? `/folder/${State.currentFolderId}` : '/');
+      }
+    } else {
+      this.exitReaderDOM();
+    }
+  },
+
+  exitReaderDOM() {
+    this.closeFootnote();
+    this.toggleTOC(false);
+    this.savePositionNow();
+
     document.getElementById('readerView').style.display = 'none';
     document.getElementById('libraryView').style.display = 'block';
 
@@ -677,9 +697,6 @@ const Reader = {
     if (pageArea) pageArea.innerHTML = '';
     State.currentRendition = null;
     State.currentBook = null;
-
-    Library.refreshStatus();
-    Library.loadFolder(State.currentFolderId);
   }
 };
 

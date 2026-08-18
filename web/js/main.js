@@ -23,9 +23,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Setup Keyboard Shortcuts Modal
   setupShortcutsModal();
 
-  // Initialize Library & Reader
+  // Initialize Library, Reader & Router
   await Library.init();
   Reader.init();
+  Router.init();
 });
 
 function updateThemeToggleIcon() {

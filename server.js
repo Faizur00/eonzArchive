@@ -61,6 +61,9 @@ function serveApp(req, res) {
 
 app.get('/', serveApp);
 app.get('/index.html', serveApp);
+app.get('/library', (req, res) => res.redirect('/#/'));
+app.get('/folder/:id', (req, res) => res.redirect(`/#/folder/${encodeURIComponent(req.params.id)}`));
+app.get('/read/:id', (req, res) => res.redirect(`/#/read/${encodeURIComponent(req.params.id)}`));
 
 // Serve static frontend from web/ (index.html is handled by serveApp so the token is embedded)
 app.use(express.static(path.join(__dirname, 'web'), { index: false }));

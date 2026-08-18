@@ -6,7 +6,6 @@ const Library = {
   async init() {
     this.bindEvents();
     await this.refreshStatus();
-    await this.loadFolder(State.currentFolderId);
   },
 
   bindEvents() {
@@ -15,7 +14,7 @@ const Library = {
     if (sortSelect) {
       sortSelect.addEventListener('change', (e) => {
         State.sortBy = e.target.value;
-        this.loadFolder(State.currentFolderId);
+        this.loadFolder(State.currentFolderId, true);
       });
     }
 
@@ -25,7 +24,7 @@ const Library = {
         document.querySelectorAll('.pill-btn[data-format]').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         State.formatFilter = btn.getAttribute('data-format');
-        this.loadFolder(State.currentFolderId);
+        this.loadFolder(State.currentFolderId, true);
       });
     });
 
@@ -35,7 +34,7 @@ const Library = {
       cachedToggle.addEventListener('click', () => {
         State.cachedOnly = !State.cachedOnly;
         cachedToggle.classList.toggle('active', State.cachedOnly);
-        this.loadFolder(State.currentFolderId);
+        this.loadFolder(State.currentFolderId, true);
       });
     }
 
@@ -82,7 +81,11 @@ const Library = {
     }
   },
 
-  async loadFolder(folderId = null) {
+  async loadFolder(folderId = null, updateUrl = true) {
+    if (updateUrl && window.Router) {
+      Router.navigate(folderId ? `/folder/${folderId}` : '/', true);
+    }
+
     const listContainer = document.getElementById('booksContainer');
     if (listContainer) {
       listContainer.innerHTML = `
@@ -114,7 +117,7 @@ const Library = {
           <div class="empty-state">
             <h3>ERROR LOADING ARCHIVE</h3>
             <p>${err.message}</p>
-            <button class="btn btn-primary btn-sm" onclick="Library.loadFolder(null)" style="margin-top: 12px;">RETURN TO ROOT</button>
+            <button class="btn btn-primary btn-sm" onclick="Router.navigate('/')" style="margin-top: 12px;">RETURN TO ROOT</button>
           </div>`;
       }
     }
@@ -139,16 +142,22 @@ const Library = {
       if (isLast) {
         return `<span class="breadcrumb-item active">${escapeHtml(crumb.name.toUpperCase())}</span>`;
       }
+      const targetPath = idx === 0 ? '/' : `/folder/${crumb.id}`;
       return `
-        <a class="breadcrumb-item" onclick="Library.loadFolder('${crumb.id}')">${escapeHtml(crumb.name.toUpperCase())}</a>
+        <a class="breadcrumb-item" onclick="Router.navigate('${targetPath}')">${escapeHtml(crumb.name.toUpperCase())}</a>
         <span class="breadcrumb-sep">/</span>`;
     }).join('');
   },
 
   goBack() {
-    if (State.breadcrumbs.length < 2) return;
-    const parent = State.breadcrumbs[State.breadcrumbs.length - 2];
-    this.loadFolder(parent ? parent.id : null);
+    if (window.history.length > 1) {
+      window.history.back();
+    } else if (State.breadcrumbs.length >= 2) {
+      const parent = State.breadcrumbs[State.breadcrumbs.length - 2];
+      Router.navigate(parent ? `/folder/${parent.id}` : '/');
+    } else {
+      Router.navigate('/');
+    }
   },
 
   renderFolders() {
@@ -163,7 +172,7 @@ const Library = {
 
     grid.style.display = 'grid';
     grid.innerHTML = State.folders.map(f => `
-      <div class="folder-card" onclick="Library.loadFolder('${f.id}')" title="${escapeHtml(f.name)}">
+      <div class="folder-card" onclick="Router.navigate('/folder/${f.id}')" title="${escapeHtml(f.name)}">
         <span class="folder-icon">
           <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
         </span>
@@ -213,16 +222,16 @@ const Library = {
                   <span>${b.cached ? `LOCAL: ${b.cachedSizeFormatted}` : 'REMOTE'}</span>
                 </div>
                 <div class="book-actions-row">
-                  <button class="btn btn-primary btn-sm" style="flex-grow: 1;" onclick="Reader.openBook('${b.id}', '${escapeQuotes(b.name)}', '${b.format}')">
-                    READ
-                  </button>
                   ${b.cached ? `
+                    <button class="btn btn-primary btn-sm" style="flex-grow: 1;" onclick="Router.navigate('/read/${b.id}')">
+                      READ
+                    </button>
                     <button class="btn btn-ghost btn-sm btn-icon" title="Delete cached file" onclick="Library.deleteCache('${b.id}')">
                       <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                     </button>
                   ` : `
-                    <button class="btn btn-secondary btn-sm btn-icon" title="Cache locally" onclick="Library.cacheBook('${b.id}')">
-                      <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <button class="btn btn-secondary btn-sm" style="flex-grow: 1;" onclick="Library.cacheBook('${b.id}')">
+                      CACHE
                     </button>
                   `}
                   ${b.webViewLink ? `
@@ -270,13 +279,15 @@ const Library = {
                     </span>
                   </td>
                   <td style="text-align: right;">
-                    <button class="btn btn-primary btn-sm" onclick="Reader.openBook('${b.id}', '${escapeQuotes(b.name)}', '${b.format}')">
-                      READ
-                    </button>
                     ${b.cached ? `
+                      <button class="btn btn-primary btn-sm" onclick="Router.navigate('/read/${b.id}')">
+                        READ
+                      </button>
                       <button class="btn btn-ghost btn-sm" onclick="Library.deleteCache('${b.id}')">PURGE</button>
                     ` : `
-                      <button class="btn btn-secondary btn-sm" onclick="Library.cacheBook('${b.id}')">CACHE</button>
+                      <button class="btn btn-secondary btn-sm" onclick="Library.cacheBook('${b.id}')">
+                        CACHE
+                      </button>
                     `}
                   </td>
                 </tr>
