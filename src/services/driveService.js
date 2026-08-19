@@ -80,16 +80,24 @@ class DriveService {
 
   init() {
     try {
-      const keyFile = findServiceAccountKeyFile(this.projectRoot);
-      if (!keyFile) {
-        console.warn('⚠️ No Google Service Account key file detected.');
-        return;
-      }
+      const credentialsJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+      if (credentialsJson) {
+        this.authClient = new google.auth.GoogleAuth({
+          credentials: JSON.parse(credentialsJson),
+          scopes: ['https://www.googleapis.com/auth/drive.readonly']
+        });
+      } else {
+        const keyFile = findServiceAccountKeyFile(this.projectRoot);
+        if (!keyFile) {
+          console.warn('⚠️ No Google Service Account key file detected.');
+          return;
+        }
 
-      this.authClient = new google.auth.GoogleAuth({
-        keyFile: keyFile,
-        scopes: ['https://www.googleapis.com/auth/drive.readonly']
-      });
+        this.authClient = new google.auth.GoogleAuth({
+          keyFile: keyFile,
+          scopes: ['https://www.googleapis.com/auth/drive.readonly']
+        });
+      }
 
       this.driveClient = google.drive({ version: 'v3', auth: this.authClient });
 
