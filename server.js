@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const crypto = require('crypto');
+const os = require('os');
 const path = require('path');
 const fs = require('fs');
 
@@ -279,6 +280,21 @@ app.use(serveApp);
 app.listen(PORT, HOST, async () => {
   console.log(`🚀 Personal Ebook Archive Server running at http://${HOST}:${PORT}`);
   console.log(`📖 Web UI accessible at http://localhost:${PORT}`);
+
+  // Log every reachable address (LAN IP + any bridge/container IPs)
+  const addresses = [];
+  for (const ifaces of Object.values(os.networkInterfaces())) {
+    for (const iface of ifaces || []) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        addresses.push(iface.address);
+      }
+    }
+  }
+  if (addresses.length > 0) {
+    for (const addr of addresses) {
+      console.log(`🌐 Reachable from other devices at http://${addr}:${PORT}`);
+    }
+  }
 
   // Perform an initial background sync if library is empty
   const status = await driveService.getStatus();

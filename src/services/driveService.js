@@ -87,16 +87,39 @@ class DriveService {
           scopes: ['https://www.googleapis.com/auth/drive.readonly']
         });
       } else {
-        const keyFile = findServiceAccountKeyFile(this.projectRoot);
-        if (!keyFile) {
-          console.warn('⚠️ No Google Service Account key file detected.');
-          return;
-        }
+        const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL;
+        const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
+        if (clientEmail && privateKey) {
+          const credentials = {
+            type: 'service_account',
+            client_email: clientEmail,
+            private_key: privateKey.replace(/\\n/g, '\n')
+          };
+          if (process.env.GOOGLE_SERVICE_ACCOUNT_PROJECT_ID) {
+            credentials.project_id = process.env.GOOGLE_SERVICE_ACCOUNT_PROJECT_ID;
+          }
+          if (process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY_ID) {
+            credentials.private_key_id = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY_ID;
+          }
+          if (process.env.GOOGLE_SERVICE_ACCOUNT_CLIENT_ID) {
+            credentials.client_id = process.env.GOOGLE_SERVICE_ACCOUNT_CLIENT_ID;
+          }
+          this.authClient = new google.auth.GoogleAuth({
+            credentials: credentials,
+            scopes: ['https://www.googleapis.com/auth/drive.readonly']
+          });
+        } else {
+          const keyFile = findServiceAccountKeyFile(this.projectRoot);
+          if (!keyFile) {
+            console.warn('⚠️ No Google Service Account credentials detected.');
+            return;
+          }
 
-        this.authClient = new google.auth.GoogleAuth({
-          keyFile: keyFile,
-          scopes: ['https://www.googleapis.com/auth/drive.readonly']
-        });
+          this.authClient = new google.auth.GoogleAuth({
+            keyFile: keyFile,
+            scopes: ['https://www.googleapis.com/auth/drive.readonly']
+          });
+        }
       }
 
       this.driveClient = google.drive({ version: 'v3', auth: this.authClient });
@@ -119,7 +142,9 @@ class DriveService {
    */
   async getStatus() {
     const keyFile = findServiceAccountKeyFile(this.projectRoot);
-    const keyDetected = !!keyFile;
+    const keyDetected = !!keyFile
+      || !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON
+      || !!(process.env.GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL && process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY);
     const cacheStats = this.cacheService.getCacheStats();
 
     let rootStatus = {
