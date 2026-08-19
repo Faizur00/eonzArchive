@@ -57,16 +57,19 @@ const Reader = {
       });
     }
 
-    // Theme selector buttons inside popover
-    document.querySelectorAll('.reader-theme-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const t = btn.getAttribute('data-rtheme');
-        State.setReaderTheme(t);
-        document.querySelectorAll('.reader-theme-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        this.applyReadingStyles();
+    // Theme toggle inside popover (single unified theme for the whole webapp)
+    const readerThemeToggle = document.getElementById('readerThemeToggle');
+    if (readerThemeToggle) {
+      readerThemeToggle.addEventListener('click', async () => {
+        const nextTheme = State.theme === 'dark' ? 'light' : 'dark';
+        State.setTheme(nextTheme);
+        this.applyReaderThemeUI();
+        if (State.currentBook) {
+          this.applyReadingStyles();
+          await this.rebuildRendition();
+        }
       });
-    });
+    }
 
     // Width presets inside popover
     document.querySelectorAll('.width-btn').forEach(btn => {
@@ -162,17 +165,20 @@ const Reader = {
   },
 
   applySettingsToDOM() {
-    State.setReaderTheme(State.readerTheme);
+    this.applyReaderThemeUI();
     State.setReaderWidth(State.readerWidth);
     
     // Highlight active popover buttons
-    const activeThemeBtn = document.querySelector(`.reader-theme-btn[data-rtheme="${State.readerTheme}"]`);
-    if (activeThemeBtn) activeThemeBtn.classList.add('active');
-    
     const activeWidthBtn = document.querySelector(`.width-btn[data-width="${State.readerWidth}"]`);
     if (activeWidthBtn) activeWidthBtn.classList.add('active');
     
     this.updateFontSizeDisplay();
+  },
+
+  applyReaderThemeUI() {
+    document.documentElement.setAttribute('data-theme', State.theme);
+    const btn = document.getElementById('readerThemeToggle');
+    if (btn) btn.textContent = State.theme === 'dark' ? 'DARK MODE' : 'LIGHT MODE';
   },
 
   updateFontSizeDisplay() {
@@ -273,10 +279,8 @@ const Reader = {
       window.transMap = window.transMap || {};
 
       const bgMap = {
-        bone: '#f4f4f0',
-        light: '#ffffff',
-        oled: '#000000',
-        dark: '#171a1d'
+        light: '#f4f0e6',
+        dark: '#1b1e21'
       };
 
       const config = Object.assign({
@@ -284,11 +288,11 @@ const Reader = {
         readerMode: State.readerMode,
         animation: 'none',
         charset: 'utf-8',
-        isDarkMode: State.readerTheme === 'dark' || State.readerTheme === 'oled' ? 'yes' : 'no',
+        isDarkMode: State.theme === 'dark' ? 'yes' : 'no',
         convertChinese: 'no',
         isConvertPDF: 'no',
         isMobile: 'no',
-        backgroundColor: bgMap[State.readerTheme] || '#171a1d'
+        backgroundColor: bgMap[State.theme] || '#1b1e21'
       }, overrides);
 
       let rendition = null;
@@ -455,17 +459,11 @@ const Reader = {
       doc.head.appendChild(style);
     }
 
-    let bg = '#171a1d';
-    let text = '#eceff2';
-    if (State.readerTheme === 'bone') {
-      bg = '#f4f4f0';
-      text = '#1f2226';
-    } else if (State.readerTheme === 'light') {
-      bg = '#ffffff';
-      text = '#181a1c';
-    } else if (State.readerTheme === 'oled') {
-      bg = '#000000';
-      text = '#d8dbe0';
+    let bg = '#1b1e21';
+    let text = '#e3e6e9';
+    if (State.theme === 'light') {
+      bg = '#f4f0e6';
+      text = '#2b2a26';
     }
 
     style.textContent = `

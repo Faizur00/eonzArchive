@@ -270,43 +270,23 @@
   letter-spacing: 0.5px;
 }
 
-/* Theme selector grid in reader */
-.theme-selector-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 4px;
-}
-.reader-theme-btn {
-  padding: 6px 2px;
+/* Theme toggle in reader popover */
+.reader-theme-toggle {
+  padding: 8px;
   border: 1px solid var(--border-medium);
+  background: var(--bg-surface-elevated);
+  color: var(--text-primary);
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.4px;
   text-transform: uppercase;
   cursor: pointer;
-  text-align: center;
   transition: all var(--transition-fast);
 }
-.reader-theme-btn.theme-dark {
-  background: #171a1d;
-  color: #eceff2;
-}
-.reader-theme-btn.theme-bone {
-  background: #f4f4f0;
-  color: #1f2226;
-}
-.reader-theme-btn.theme-light {
-  background: #ffffff;
-  color: #181a1c;
-}
-.reader-theme-btn.theme-oled {
-  background: #000000;
-  color: #d8dbe0;
-}
-.reader-theme-btn.active {
-  outline: 2px solid var(--text-primary);
-  outline-offset: 1px;
+.reader-theme-toggle:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
 }
 
 /* Width preset buttons */

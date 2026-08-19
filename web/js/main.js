@@ -9,10 +9,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Setup Theme Toggle Button
   const themeToggleBtn = document.getElementById('themeToggleBtn');
   if (themeToggleBtn) {
-    themeToggleBtn.addEventListener('click', () => {
+    themeToggleBtn.addEventListener('click', async () => {
       const nextTheme = State.theme === 'dark' ? 'light' : 'dark';
       State.setTheme(nextTheme);
       updateThemeToggleIcon();
+      if (State.currentBook) {
+        Reader.applyReadingStyles();
+        await Reader.rebuildRendition();
+      }
     });
     updateThemeToggleIcon();
   }

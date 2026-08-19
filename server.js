@@ -281,6 +281,12 @@ app.listen(PORT, HOST, async () => {
   console.log(`🚀 Personal Ebook Archive Server running at http://${HOST}:${PORT}`);
   console.log(`📖 Web UI accessible at http://localhost:${PORT}`);
 
+  // Log the custom domain, when the Caddy reverse proxy routes it to this container.
+  const customDomain = process.env.CUSTOM_DOMAIN || 'eonzarchive.local';
+  if (customDomain) {
+    console.log(`🌐 Reachable at http://${customDomain} (via reverse proxy)`);
+  }
+
   // Log every reachable address (LAN IP + any bridge/container IPs)
   const addresses = [];
   for (const ifaces of Object.values(os.networkInterfaces())) {

@@ -15,11 +15,10 @@ const State = {
   sortBy: 'name',
   viewMode: localStorage.getItem('eonz.viewMode') || 'grid', // 'grid' or 'list'
 
-  // App Theme
+  // App Theme (single source of truth for the whole webapp, including the reader)
   theme: localStorage.getItem('eonz.theme') || 'dark',
 
   // Reader Settings
-  readerTheme: localStorage.getItem('eonz.reader.theme') || 'dark', // 'dark', 'bone', 'light', 'oled'
   readerMode: localStorage.getItem('eonz.reader.mode') || 'single',
   readerWidth: localStorage.getItem('eonz.reader.width') || 'standard',
   readerFontSize: parseFloat(localStorage.getItem('eonz.spacing.font') || '1'),
@@ -36,13 +35,6 @@ const State = {
     this.theme = theme;
     localStorage.setItem('eonz.theme', theme);
     document.documentElement.setAttribute('data-theme', theme);
-  },
-
-  setReaderTheme(readerTheme) {
-    if (readerTheme === 'sepia') readerTheme = 'bone';
-    this.readerTheme = readerTheme;
-    localStorage.setItem('eonz.reader.theme', readerTheme);
-    document.documentElement.setAttribute('data-reader-theme', readerTheme);
   },
 
   setViewMode(mode) {
