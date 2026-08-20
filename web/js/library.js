@@ -230,7 +230,7 @@ const Library = {
                       <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                     </button>
                   ` : `
-                    <button class="btn btn-secondary btn-sm" style="flex-grow: 1;" onclick="Library.cacheBook('${b.id}')">
+                    <button class="btn btn-secondary btn-sm cache-btn" style="flex-grow: 1;" data-book-id="${b.id}" onclick="Library.cacheBook('${b.id}')">
                       CACHE
                     </button>
                   `}
@@ -285,7 +285,7 @@ const Library = {
                       </button>
                       <button class="btn btn-ghost btn-sm" onclick="Library.deleteCache('${b.id}')">PURGE</button>
                     ` : `
-                      <button class="btn btn-secondary btn-sm" onclick="Library.cacheBook('${b.id}')">
+                      <button class="btn btn-secondary btn-sm cache-btn" data-book-id="${b.id}" onclick="Library.cacheBook('${b.id}')">
                         CACHE
                       </button>
                     `}
@@ -323,6 +323,14 @@ const Library = {
   },
 
   async cacheBook(fileId) {
+    const btn = document.querySelector(`.cache-btn[data-book-id="${fileId}"]`);
+    const original = btn ? btn.innerHTML : null;
+    if (btn) {
+      btn.classList.add('btn-progress');
+      btn.disabled = true;
+      btn.innerHTML = 'CACHING...';
+    }
+
     showToast('Caching Record', 'Downloading document to local archive...', 'info');
     try {
       await API.cacheBook(fileId);
@@ -331,6 +339,12 @@ const Library = {
       await this.loadFolder(State.currentFolderId);
     } catch (err) {
       showToast('Cache Failed', err.message, 'danger');
+    } finally {
+      if (btn && btn.isConnected) {
+        btn.classList.remove('btn-progress');
+        btn.disabled = false;
+        btn.innerHTML = original || 'CACHE';
+      }
     }
   },
 
