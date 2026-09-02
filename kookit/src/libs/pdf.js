@@ -287,6 +287,19 @@ const renderPage = async (page, getImageBlob) => {
         pointer-events: none;
     }
 
+    .noteLayer {
+        position: absolute !important;
+        z-index: 2 !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        pointer-events: none !important;
+    }
+    .noteLayer > * {
+        pointer-events: auto !important;
+    }
+
     #canvas {
         position: relative;
         z-index: 0;
@@ -331,23 +344,26 @@ const renderPage = async (page, getImageBlob) => {
        Without these rules, PDFs that embed a 90/180/270 degree page rotation
        can render the text/annotation layers mirrored relative to the canvas. */
     .textLayer[data-main-rotation="90"],
-    .annotationLayer[data-main-rotation="90"] {
+    .annotationLayer[data-main-rotation="90"],
+    .noteLayer[data-main-rotation="90"] {
         transform: rotate(90deg) translateY(-100%);
     }
 
     .textLayer[data-main-rotation="180"],
-    .annotationLayer[data-main-rotation="180"] {
+    .annotationLayer[data-main-rotation="180"],
+    .noteLayer[data-main-rotation="180"] {
         transform: rotate(180deg) translate(-100%, -100%);
     }
 
     .textLayer[data-main-rotation="270"],
-    .annotationLayer[data-main-rotation="270"] {
+    .annotationLayer[data-main-rotation="270"],
+    .noteLayer[data-main-rotation="270"] {
         transform: rotate(270deg) translateX(-100%);
     }
     </style>
-    <div class="noteLayer"></div>
     <div class="koodoPDFLayer" id="koodoPDFLayer">
         <div id="canvas"></div>
+        <div class="noteLayer" id="noteLayer"></div>
         <div class="textLayer" id="textLayer"></div>
         <canvas class="fabric" id="fabric"></canvas>
         <div class="annotationLayer" id="annotationLayer"></div>

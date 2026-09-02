@@ -12,9 +12,9 @@ export const classes = [
   "line-2",
   "line-3",
 ];
-export const colors = ["#FEF3CD", "#FBFACC", "#CEFACD", "#CDE9FA"];
-export const lines = ["#FF0000", "#000080", "#0000FF", "#2EFF2E"];
-export const pdfColors = ["#fac106", "#ebe702", "#0be603", "#0493e6"];
+export const colors = ["#fef08a", "#bbf7d0", "#99f6e4", "#bae6fd"];
+export const lines = ["#ef4444", "#3b82f6", "#10b981", "#f59e0b"];
+export const pdfColors = ["#fef08a", "#bbf7d0", "#99f6e4", "#bae6fd"];
 
 export const buildHighlightStyleForType = (
   colorCode: string | number,
@@ -22,7 +22,7 @@ export const buildHighlightStyleForType = (
   isVertical?: boolean
 ): string => {
   let styleType: string = "background";
-  let rawColor: string = "#FEF3CD";
+  let rawColor: string = "#fef08a";
   if (typeof colorCode === "number") {
     if (colorCode >= 0 && colorCode < classes.length) {
       const isBackground = classes[colorCode].indexOf("color") > -1;
@@ -30,30 +30,36 @@ export const buildHighlightStyleForType = (
       styleType = isBackground ? "background" : "underline";
       rawColor = isBackground ? colors[colorIdx] : lines[colorIdx];
     }
-  } else {
-    styleType = colorCode.split("-")[0];
-    rawColor = colorCode.split("-")[1];
+  } else if (typeof colorCode === "string") {
+    if (colorCode.startsWith("color-") || colorCode.startsWith("line-")) {
+      const isBackground = colorCode.startsWith("color");
+      const colorIdx = parseInt(colorCode.split("-")[1], 10) || 0;
+      styleType = isBackground ? "background" : "underline";
+      rawColor = isBackground ? (colors[colorIdx] || "#fef08a") : (lines[colorIdx] || "#ef4444");
+    } else if (colorCode.indexOf("-") > -1) {
+      styleType = colorCode.split("-")[0];
+      rawColor = colorCode.slice(styleType.length + 1);
+    } else {
+      styleType = "background";
+      rawColor = colorCode || "#fef08a";
+    }
   }
   const color =
-    styleType === "background" ? hexToRgba(rawColor, 0.8) : rawColor;
+    styleType === "background"
+      ? (forPDFOverlay ? rawColor : hexToRgba(rawColor, 0.85))
+      : rawColor;
 
   switch (styleType) {
     case "background":
       if (forPDFOverlay) {
-        // Use multiply blend mode so the highlight tints the text area without
-        // covering it — the same visual effect as a physical highlighter pen.
-        // Fully opaque color is intentional: mix-blend-mode: multiply handles
-        // the visual blending; alpha transparency is not needed and would fight it.
-        return `background: ${color}; mix-blend-mode: multiply;`;
+        return `background-color: ${color} !important; mix-blend-mode: multiply !important; opacity: 0.65 !important;`;
       }
-      return `background: ${color};`;
+      return `background-color: ${color} !important;`;
     case "underline":
-      // In vertical writing mode, border-bottom stays on the physical bottom;
-      // the underline should run along the inline-end (right) edge instead.
       if (isVertical && !forPDFOverlay) {
-        return `border-right: 2px solid ${color};`;
+        return `border-right: 2.5px solid ${color} !important; background-color: transparent !important;`;
       }
-      return `border-bottom: 2px solid ${color};`;
+      return `border-bottom: 2.5px solid ${color} !important; background-color: transparent !important;`;
     case "strikethrough":
       if (forPDFOverlay) {
         // text-decoration doesn't render on empty divs; simulate with a gradient
@@ -262,7 +268,8 @@ export const showNoteHighlightBatch = (
   for (let i = 0; i < notes.length; i++) {
     const item = notes[i];
     try {
-      selection.restoreCharacterRanges(doc, [item.range]);
+      const targetRoot = doc.body || doc;
+      selection.restoreCharacterRanges(targetRoot, [item.range]);
       const nativeRange = selection.getRangeAt(0).nativeRange.cloneRange();
       resolved.push({
         nativeRange,
@@ -324,7 +331,8 @@ export const showNoteHighlight = (
   // node), and the tooltip uses class "kookit-note-tooltip" (not counted).
 
   let selection = rangy.getSelection(iframe);
-  selection.restoreCharacterRanges(doc, temp);
+  const targetRoot = doc.body || doc;
+  selection.restoreCharacterRanges(targetRoot, temp);
   let newRange = selection.getRangeAt(0);
   highlightRange(
     newRange,
@@ -351,8 +359,22 @@ export const showPDFHighlight = (
   isMobile: boolean,
   noteContent: string = ""
 ) => {
+  let docLayer: any = doc.querySelector("#koodoPDFLayer");
   let pageElement: any = doc.querySelector(".noteLayer");
-  let docLayer = doc.querySelector("#koodoPDFLayer");
+  if (!pageElement && docLayer) {
+    pageElement = doc.createElement("div");
+    pageElement.className = "noteLayer";
+    pageElement.id = "noteLayer";
+    docLayer.insertBefore(pageElement, docLayer.firstChild?.nextSibling || null);
+  }
+  if (!pageElement && !docLayer) return;
+
+  const targetContainer = pageElement || docLayer;
+  const isInsideDocLayer = docLayer && docLayer.contains(targetContainer);
+  const leftOffset = isInsideDocLayer
+    ? 0
+    : (parseFloat(getComputedStyle(docLayer).marginLeft) || 0);
+
   var viewport = page.getViewport({ scale: scale });
   let rects: any[] = [];
   //convertToViewportRectangle
@@ -421,37 +443,34 @@ export const showPDFHighlight = (
   for (let i = 0; i < filteredRects.length; i++) {
     const rect = filteredRects[i];
     var newNode = document.createElement("div");
-    if (!docLayer) {
-      continue;
-    }
-    newNode?.setAttribute(
+    newNode.setAttribute(
       "style",
-      "position: absolute;" +
+      "position: absolute !important;" +
         buildHighlightStyleForType(colorCode, true, isVerticalLayout()) +
         " left:" +
-        (rect.left + parseFloat(getComputedStyle(docLayer).marginLeft)) +
-        "px; top:" +
+        (rect.left + leftOffset) +
+        "px !important; top:" +
         rect.top +
-        "px;" +
+        "px !important;" +
         "width:" +
         rect.width +
-        "px; height:" +
+        "px !important; height:" +
         rect.height +
-        "px; z-index: 1; cursor: pointer;"
+        "px !important; z-index: 2 !important; cursor: pointer !important; pointer-events: auto !important;"
     );
-    newNode?.setAttribute("data-key", noteKey);
-    newNode?.setAttribute("class", "kookit-note");
+    newNode.setAttribute("data-key", noteKey);
+    newNode.setAttribute("class", "kookit-note");
     if (isNote && noteContent) {
-      newNode?.setAttribute("data-note-content", noteContent);
+      newNode.setAttribute("data-note-content", noteContent);
     }
-    newNode?.addEventListener("mouseenter", (event: any) => {
+    newNode.addEventListener("mouseenter", (event: any) => {
       if (!isNote || !noteContent) return;
       showNoteTooltip(noteContent, event.currentTarget as HTMLElement, doc);
     });
-    newNode?.addEventListener("mouseleave", () => {
+    newNode.addEventListener("mouseleave", () => {
       hideNoteTooltip(doc);
     });
-    newNode?.addEventListener("click", (event: any) => {
+    newNode.addEventListener("click", (event: any) => {
       if (event && event.target) {
         if (
           (event.target as any).dataset &&
@@ -481,7 +500,7 @@ export const showPDFHighlight = (
       event.preventDefault();
       event.stopPropagation();
     };
-    pageElement.appendChild(newNode);
+    targetContainer.appendChild(newNode);
   }
 };
 

@@ -152,10 +152,23 @@ const Reader = {
         } else if (e.key === 'Escape') {
           if (this.isFootnoteOpen()) {
             this.closeFootnote();
-          } else if (document.getElementById('tocDrawer').classList.contains('open')) {
+          } else if (document.getElementById('annotationsDrawer')?.classList.contains('open')) {
+            if (window.Annotations) Annotations.toggleDrawer(false);
+          } else if (document.getElementById('tocDrawer')?.classList.contains('open')) {
             this.toggleTOC(false);
+          } else if (window.Annotations && Annotations.activeTool !== 'none') {
+            Annotations.setToolMode('none');
           } else {
             this.closeReader();
+          }
+        } else if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+          if ((e.key === 'h' || e.key === 'H') && window.Annotations) {
+            Annotations.setToolMode(Annotations.activeTool === 'highlight' ? 'none' : 'highlight');
+          } else if ((e.key === 'd' || e.key === 'D') && window.Annotations) {
+            Annotations.setToolMode(Annotations.activeTool === 'draw' ? 'none' : 'draw');
+          } else if ((e.key === 'a' || e.key === 'A') && window.Annotations) {
+            const drawer = document.getElementById('annotationsDrawer');
+            Annotations.toggleDrawer(!drawer?.classList.contains('open'));
           }
         }
       }
@@ -254,6 +267,10 @@ const Reader = {
         format: format.toUpperCase(),
         buffer
       };
+
+      if (window.Annotations) {
+        await Annotations.loadForBook(fileId);
+      }
 
       await this.buildRendition();
       showToast('Document Ready', `Opened "${bookName}"`, 'success');
@@ -355,8 +372,15 @@ const Reader = {
       await this.populateTOC(rendition);
 
       if (rendition.on) {
-        rendition.on('rendered', () => {
+        rendition.on('rendered', (chapterDocIndex) => {
           this.applyReadingStyles();
+          this.attachIframeInterceptors(rendition);
+          if (window.Annotations) {
+            if (chapterDocIndex !== undefined && chapterDocIndex !== null) {
+              Annotations.currentChapterDocIndex = parseInt(chapterDocIndex, 10) || 0;
+            }
+            Annotations.renderAllForCurrentPage();
+          }
         });
         rendition.on('page-changed', () => {
           this.onPageChanged();
@@ -365,6 +389,7 @@ const Reader = {
 
       this.savePositionNow();
       this.applyReadingStyles();
+      if (window.Annotations) Annotations.renderAllForCurrentPage();
     } finally {
       State.isBuildingRendition = false;
       this.hideLoading();
@@ -374,6 +399,21 @@ const Reader = {
   attachIframeInterceptors(rendition) {
     const epubDoc = rendition.getDocument && rendition.getDocument();
     const epubIframe = rendition.getIframe && rendition.getIframe();
+    
+    if (epubDoc && epubIframe && window.Annotations) {
+      Annotations.attachSelectionListeners(epubDoc, epubIframe);
+    }
+
+    if (rendition && typeof rendition.getAllDocuments === 'function') {
+      const allDocs = rendition.getAllDocuments();
+      allDocs.forEach((d) => {
+        if (d && window.Annotations) {
+          const ifr = d.defaultView ? d.defaultView.frameElement : null;
+          Annotations.attachSelectionListeners(d, ifr);
+        }
+      });
+    }
+
     if (!epubDoc || !epubIframe || epubDoc.__kookitEventsAttached) return;
 
     epubDoc.__kookitEventsAttached = true;
@@ -442,6 +482,9 @@ const Reader = {
         const cIndex = parseInt(el.getAttribute('data-chapter-index'), 10);
         el.classList.toggle('active', cIndex === pos.chapterDocIndex);
       });
+      if (window.Annotations) {
+        Annotations.onPageChanged(pos.chapterDocIndex);
+      }
     }
 
     this.savePositionDebounced();
@@ -480,6 +523,30 @@ const Reader = {
       body p, body div, body span, body li, body a, body blockquote {
         word-spacing: inherit !important;
         letter-spacing: inherit !important;
+      }
+      .kookit-note {
+        cursor: pointer !important;
+        border-radius: 2px !important;
+      }
+      .kookit-note.color-0, .kookit-note[data-color="color-0"] {
+        background-color: rgba(254, 240, 138, 0.45) !important;
+        color: inherit !important;
+      }
+      .kookit-note.color-1, .kookit-note[data-color="color-1"] {
+        background-color: rgba(187, 247, 208, 0.45) !important;
+        color: inherit !important;
+      }
+      .kookit-note.color-2, .kookit-note[data-color="color-2"] {
+        background-color: rgba(153, 246, 228, 0.45) !important;
+        color: inherit !important;
+      }
+      .kookit-note.color-3, .kookit-note[data-color="color-3"] {
+        background-color: rgba(186, 230, 253, 0.45) !important;
+        color: inherit !important;
+      }
+      .kookit-note.line-0, .kookit-note[data-color="line-0"] {
+        border-bottom: 2.5px solid #ef4444 !important;
+        background-color: transparent !important;
       }
     `;
   },
@@ -687,6 +754,12 @@ const Reader = {
     this.closeFootnote();
     this.toggleTOC(false);
     this.savePositionNow();
+
+    if (window.Annotations) {
+      Annotations.setToolMode('none');
+      Annotations.toggleDrawer(false);
+      Annotations.hideSelectionToolbar();
+    }
 
     document.getElementById('readerView').style.display = 'none';
     document.getElementById('libraryView').style.display = 'block';

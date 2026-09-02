@@ -7,6 +7,7 @@ const fs = require('fs');
 
 const CacheService = require('./src/services/cacheService');
 const DriveService = require('./src/services/driveService');
+const AnnotationService = require('./src/services/annotationService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -51,6 +52,7 @@ app.use('/api', (req, res, next) => {
 // Initialize Services
 const cacheService = new CacheService(PROJECT_ROOT);
 const driveService = new DriveService(PROJECT_ROOT, cacheService);
+const annotationService = new AnnotationService(PROJECT_ROOT);
 
 // Serve the SPA shell with the API token embedded for the same-origin frontend.
 function serveApp(req, res) {
@@ -209,6 +211,49 @@ app.get('/api/cache/stats', (req, res) => {
 app.delete('/api/cache', (req, res) => {
   try {
     const result = cacheService.clearAllCache();
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/book/:id/annotations - Get all annotations for a specific book
+ */
+app.get('/api/book/:id/annotations', (req, res) => {
+  try {
+    const annotations = annotationService.getAnnotations(req.params.id);
+    res.json({ success: true, data: annotations });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/book/:id/annotations - Save/sync annotations (single or list) for a book
+ */
+app.post('/api/book/:id/annotations', (req, res) => {
+  try {
+    const body = req.body;
+    if (Array.isArray(body)) {
+      const result = annotationService.saveAnnotations(req.params.id, body);
+      return res.json({ success: true, data: result });
+    } else if (body && typeof body === 'object') {
+      const saved = annotationService.upsertAnnotation(req.params.id, body);
+      return res.json({ success: true, data: saved });
+    }
+    res.status(400).json({ success: false, error: 'Invalid annotations payload' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/book/:id/annotations/:annotationId - Delete a single annotation
+ */
+app.delete('/api/book/:id/annotations/:annotationId', (req, res) => {
+  try {
+    const result = annotationService.deleteAnnotation(req.params.id, req.params.annotationId);
     res.json({ success: true, data: result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

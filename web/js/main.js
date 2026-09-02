@@ -27,9 +27,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Setup Keyboard Shortcuts Modal
   setupShortcutsModal();
 
-  // Initialize Library, Reader & Router
+  // Initialize Library, Reader, Annotations & Router
   await Library.init();
   Reader.init();
+  if (window.Annotations) Annotations.init();
   Router.init();
 });
 
@@ -150,42 +151,10 @@ function setupShortcutsModal() {
   });
 }
 
-// Global Toast Alert Helper
+// Global Toast Alert Helper (Disabled globally per user specification)
 function showToast(title, desc = '', type = 'info') {
-  const container = document.getElementById('toastContainer');
-  if (!container) return;
-
-  const toast = document.createElement('div');
-  toast.className = 'toast';
-
-  let iconSvg = '';
-  if (type === 'success') {
-    iconSvg = `<svg class="icon icon-sm" style="color:var(--color-success);" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>`;
-  } else if (type === 'danger') {
-    iconSvg = `<svg class="icon icon-sm" style="color:var(--color-danger);" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
-  } else {
-    iconSvg = `<svg class="icon icon-sm" style="color:var(--brand-primary);" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`;
-  }
-
-  toast.innerHTML = `
-    <div class="toast-icon">${iconSvg}</div>
-    <div class="toast-content">
-      <div class="toast-title">${escapeHtml(title)}</div>
-      ${desc ? `<div class="toast-desc">${escapeHtml(desc)}</div>` : ''}
-    </div>
-    <button class="toast-close" onclick="this.parentElement.remove()">✕</button>
-  `;
-
-  container.appendChild(toast);
-
-  // Trigger animation
-  requestAnimationFrame(() => toast.classList.add('show'));
-
-  // Auto dismiss
-  setTimeout(() => {
-    toast.classList.remove('show');
-    setTimeout(() => toast.remove(), 300);
-  }, 4000);
+  // Global notifications disabled
+  return;
 }
 
 window.showToast = showToast;

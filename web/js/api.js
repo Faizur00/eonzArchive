@@ -70,6 +70,30 @@ const API = {
 
   clearAllCache() {
     return this.request('/api/cache', { method: 'DELETE' });
+  },
+
+  getAnnotations(fileId) {
+    return this.request(`/api/book/${fileId}/annotations`);
+  },
+
+  saveAnnotations(fileId, annotationsList) {
+    return this.request(`/api/book/${fileId}/annotations`, {
+      method: 'POST',
+      body: annotationsList
+    });
+  },
+
+  saveAnnotation(fileId, annotation) {
+    return this.request(`/api/book/${fileId}/annotations`, {
+      method: 'POST',
+      body: annotation
+    });
+  },
+
+  deleteAnnotation(fileId, annotationId) {
+    return this.request(`/api/book/${fileId}/annotations/${annotationId}`, {
+      method: 'DELETE'
+    });
   }
 };
 

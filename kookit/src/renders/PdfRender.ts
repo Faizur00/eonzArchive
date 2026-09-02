@@ -792,51 +792,58 @@ class PdfRender extends GeneralRender {
     return { page: pageIndex, coords: selected, readerMode: this.readerMode };
   }
   async renderHighlighters(notes: any[], handleNoteClick: any) {
-    if (notes.length === 0) return;
-    notes = notes.reverse();
-    let chapterIndex = notes[0].chapterIndex;
-    let subIframe = this.getSubIframe(chapterIndex);
-    let subDoc = this.getSubDocument(chapterIndex);
-    if (!subDoc || !subIframe) return;
-    clearHighlight(subDoc);
-    let iWin: any =
-      subIframe.contentWindow || subIframe.contentDocument?.defaultView;
-    for (let index = 0; index < notes.length; index++) {
-      const item = notes[index];
-      let selected = JSON.parse(item.range);
-      if (item.color === "annotation") {
-        // fabric canvas 批注：selected 即 getAnnotationData 返回的 toJSON 数据
-        await this.restoreAnnotation(item.chapterIndex, selected);
-        continue;
+    if (!notes || notes.length === 0) return;
+    const clonedNotes = [...notes].reverse();
+
+    const pageMap = new Map<number, any[]>();
+    for (const item of clonedNotes) {
+      let selected = typeof item.range === "string" ? JSON.parse(item.range) : item.range;
+      const pageIdx = item.chapterIndex !== undefined && item.chapterIndex !== null
+        ? parseInt(item.chapterIndex + "", 10)
+        : parseInt((selected?.page || 0) + "", 10);
+      if (!pageMap.has(pageIdx)) pageMap.set(pageIdx, []);
+      pageMap.get(pageIdx)!.push({ ...item, parsedRange: selected });
+    }
+
+    for (const [chapterIndex, pageNotes] of pageMap.entries()) {
+      let subIframe = this.getSubIframe(chapterIndex);
+      let subDoc = this.getSubDocument(chapterIndex);
+      if (!subDoc || !subIframe) continue;
+      clearHighlight(subDoc);
+      let iWin: any =
+        subIframe.contentWindow || subIframe.contentDocument?.defaultView;
+      for (let index = 0; index < pageNotes.length; index++) {
+        const item = pageNotes[index];
+        let selected = item.parsedRange;
+        if (item.color === "annotation") {
+          await this.restoreAnnotation(chapterIndex, selected);
+          continue;
+        }
+        let page = await this.chapterDocList[chapterIndex].text.getPage();
+        let scale = await this.getPdfScale();
+        try {
+          showPDFHighlight(
+            selected,
+            item.color,
+            item.key,
+            handleNoteClick,
+            page,
+            scale,
+            subDoc,
+            item.notes !== "",
+            this.isMobile === "yes",
+            item.notes || ""
+          );
+        } catch (e) {
+          console.warn(
+            e,
+            "Exception has been caught when restore character ranges."
+          );
+        }
       }
-      var pageIndex = parseInt(selected.page + "");
-      if (pageIndex !== chapterIndex) {
-        continue;
+      if (iWin && iWin.getSelection()) {
+        iWin.getSelection()?.empty();
       }
-      let page = await this.chapterDocList[pageIndex].text.getPage();
-      let scale = await this.getPdfScale();
-      try {
-        showPDFHighlight(
-          selected,
-          item.color,
-          item.key,
-          handleNoteClick,
-          page,
-          scale,
-          subDoc,
-          item.notes !== "",
-          this.isMobile === "yes",
-          item.notes || ""
-        );
-      } catch (e) {
-        console.warn(
-          e,
-          "Exception has been caught when restore character ranges."
-        );
-        return;
-      }
-      if (!iWin || !iWin.getSelection()) return;
-      iWin.getSelection()?.empty();
     }
   }
   async restoreAnnotation(chapterDocIndex: number, data: any) {
@@ -1215,7 +1222,13 @@ class PdfRender extends GeneralRender {
 
       let noteLayer: any = subDoc.querySelector(".noteLayer");
       if (noteLayer) {
-        noteLayer.style.position = "relative";
+        noteLayer.style.position = "absolute";
+        noteLayer.style.top = "0";
+        noteLayer.style.left = "0";
+        noteLayer.style.width = "100%";
+        noteLayer.style.height = "100%";
+        noteLayer.style.zIndex = "2";
+        noteLayer.style.pointerEvents = "none";
       }
     }
     if (this.readerMode !== "scroll") {

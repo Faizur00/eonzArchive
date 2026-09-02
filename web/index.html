@@ -202,6 +202,22 @@
           <button class="btn btn-secondary btn-sm" onclick="Reader.resetPdfZoom()" title="Fit">FIT</button>
         </div>
 
+        <!-- Annotation Tools -->
+        <div class="reader-annotation-tools">
+          <button id="toolHighlightBtn" class="annot-tool-btn" data-tool="highlight" onclick="Annotations.setToolMode(Annotations.activeTool === 'highlight' ? 'none' : 'highlight')" title="Highlight Tool">
+            <svg class="icon icon-xs" viewBox="0 0 24 24"><path d="m18 2 4 4-14 14H4v-4L18 2z"/><line x1="14.5" y1="5.5" x2="18.5" y2="9.5"/></svg>
+            <span>HIGHLIGHT</span>
+          </button>
+          <button id="toolDrawBtn" class="annot-tool-btn" data-tool="draw" onclick="Annotations.setToolMode(Annotations.activeTool === 'draw' ? 'none' : 'draw')" title="Free Draw Brush">
+            <svg class="icon icon-xs" viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg>
+            <span>DRAW</span>
+          </button>
+          <button id="annotationsDrawerBtn" class="annot-tool-btn" title="View Annotations Index">
+            <svg class="icon icon-xs" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10M6 10h10M6 14h6"/></svg>
+            <span id="annotationsCountBadge" class="annot-count-badge" style="display:none;">0</span>
+          </button>
+        </div>
+
         <!-- Mode Select -->
         <select id="readerModeSelect" class="select-field" style="padding: 4px 20px 4px 6px; font-size: 11px;">
           <option value="single">PAGE</option>
@@ -276,6 +292,28 @@
         <input type="text" id="tocSearchInput" placeholder="FILTER SECTIONS...">
       </div>
       <ul id="tocList" class="toc-list"></ul>
+    </aside>
+
+    <!-- Annotations Side Drawer -->
+    <div id="annotationsBackdrop" class="annotations-backdrop"></div>
+    <aside id="annotationsDrawer" class="annotations-drawer">
+      <div class="toc-header">
+        <h3>INDEX OF ANNOTATIONS</h3>
+        <button id="annotationsCloseBtn" class="btn btn-ghost btn-sm btn-icon">✕</button>
+      </div>
+      <div class="annot-tabs-bar">
+        <button class="annot-tab-btn active" data-tab="all">ALL</button>
+        <button class="annot-tab-btn" data-tab="highlight">HIGHLIGHTS</button>
+        <button class="annot-tab-btn" data-tab="drawing">DRAWINGS</button>
+      </div>
+      <div class="toc-search">
+        <input type="text" id="annotationsSearchInput" placeholder="FILTER ANNOTATIONS...">
+      </div>
+      <div id="annotationsList" class="annotations-list"></div>
+      <div style="padding: 10px 14px; border-top: 1px solid var(--border-subtle); display:flex; justify-content:space-between; align-items:center; background:var(--bg-surface-subtle);">
+        <span style="font-size:11px; font-family:var(--font-mono); color:var(--text-muted);">EXPORT ARCHIVE</span>
+        <button id="annotationsExportBtn" class="btn btn-secondary btn-sm" style="font-size:11px;">EXPORT AS MARKDOWN</button>
+      </div>
     </aside>
 
     <!-- Appearance / Settings Popover -->
@@ -357,6 +395,14 @@
             <td style="padding:8px 0; text-align:right;">[ ← ] / [ PageUp ]</td>
           </tr>
           <tr style="border-bottom:1px solid var(--border-subtle);">
+            <td style="padding:8px 0; color:var(--text-secondary);">Highlight / Free Draw</td>
+            <td style="padding:8px 0; text-align:right;">[ H ] / [ D ]</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border-subtle);">
+            <td style="padding:8px 0; color:var(--text-secondary);">Annotations Index</td>
+            <td style="padding:8px 0; text-align:right;">[ A ]</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border-subtle);">
             <td style="padding:8px 0; color:var(--text-secondary);">Close Reader / Dismiss</td>
             <td style="padding:8px 0; text-align:right;">[ Esc ]</td>
           </tr>
@@ -369,14 +415,12 @@
     </div>
   </div>
 
-  <!-- Toast Notification Container -->
-  <div id="toastContainer"></div>
-
   <!-- Application Logic Scripts -->
   <script src="/js/api.js"></script>
   <script src="/js/state.js"></script>
   <script src="/js/library.js"></script>
   <script src="/js/reader.js"></script>
+  <script src="/js/annotations.js"></script>
   <script src="/js/router.js"></script>
   <script src="/js/main.js"></script>
 </body>

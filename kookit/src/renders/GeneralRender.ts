@@ -1159,17 +1159,22 @@ class GeneralRender extends EventEmitter {
     return charRange;
   }
   async renderHighlighters(notes: any[], handleNoteClick: any) {
-    notes = notes.reverse();
+    if (!notes || notes.length === 0) return;
+    const clonedNotes = [...notes].reverse();
     let doc = this.getDocument();
     let iframe = this.getIframe();
     if (!doc || !iframe) return;
     clearHighlight(doc);
 
-    // Use batch API: resolve all character ranges on clean DOM first,
-    // then apply all inline highlights. This prevents earlier highlights
-    // from shifting character offsets for later ones.
-    const batchItems = notes.map((item) => ({
-      range: JSON.parse(item.range),
+    const currentChapter = this.tempLocation?.chapterDocIndex;
+    const filteredNotes = clonedNotes.filter((item) => {
+      if (item.chapterIndex === undefined || item.chapterIndex === null) return true;
+      if (currentChapter === undefined || currentChapter === null) return true;
+      return item.chapterIndex === currentChapter;
+    });
+
+    const batchItems = filteredNotes.map((item) => ({
+      range: typeof item.range === "string" ? JSON.parse(item.range) : item.range,
       colorCode: item.color,
       noteKey: item.key,
       isNote: item.notes !== "",
