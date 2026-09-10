@@ -208,8 +208,8 @@ const Library = {
               <div class="book-cover">
                 <div class="cover-header">
                   <span class="badge badge-${fmt}">${b.format}</span>
-                  <span class="status-pill ${b.cached ? 'cached' : ''}">
-                    <span class="status-dot"></span> ${b.cached ? 'CACHED' : 'CLOUD'}
+                  <span class="status-pill">
+                    <span class="status-dot"></span> STREAM
                   </span>
                 </div>
                 <div class="cover-title-area">
@@ -219,21 +219,12 @@ const Library = {
               <div class="book-card-body">
                 <div class="book-meta-row">
                   <span>SIZE: ${b.sizeFormatted || '0 B'}</span>
-                  <span>${b.cached ? `LOCAL: ${b.cachedSizeFormatted}` : 'REMOTE'}</span>
+                  <span>GOOGLE DRIVE</span>
                 </div>
                 <div class="book-actions-row">
-                  ${b.cached ? `
-                    <button class="btn btn-primary btn-sm" style="flex-grow: 1;" onclick="Router.navigate('/read/${b.id}')">
-                      READ
-                    </button>
-                    <button class="btn btn-ghost btn-sm btn-icon" title="Delete cached file" onclick="Library.deleteCache('${b.id}')">
-                      <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                    </button>
-                  ` : `
-                    <button class="btn btn-secondary btn-sm cache-btn" style="flex-grow: 1;" data-book-id="${b.id}" onclick="Library.cacheBook('${b.id}')">
-                      CACHE
-                    </button>
-                  `}
+                  <button class="btn btn-primary btn-sm" style="flex-grow: 1;" onclick="Router.navigate('/read/${b.id}')">
+                    READ
+                  </button>
                   ${b.webViewLink ? `
                     <a href="${b.webViewLink}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm btn-icon" title="Open in Google Drive">
                       <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
@@ -274,21 +265,19 @@ const Library = {
                   <td><span class="badge badge-${fmt}">${b.format}</span></td>
                   <td style="font-family: var(--font-mono);">${b.sizeFormatted || '0 B'}</td>
                   <td>
-                    <span class="status-pill ${b.cached ? 'cached' : ''}">
-                      <span class="status-dot"></span> ${b.cached ? 'CACHED' : 'CLOUD'}
+                    <span class="status-pill">
+                      <span class="status-dot"></span> STREAM
                     </span>
                   </td>
                   <td style="text-align: right;">
-                    ${b.cached ? `
-                      <button class="btn btn-primary btn-sm" onclick="Router.navigate('/read/${b.id}')">
-                        READ
-                      </button>
-                      <button class="btn btn-ghost btn-sm" onclick="Library.deleteCache('${b.id}')">PURGE</button>
-                    ` : `
-                      <button class="btn btn-secondary btn-sm cache-btn" data-book-id="${b.id}" onclick="Library.cacheBook('${b.id}')">
-                        CACHE
-                      </button>
-                    `}
+                    <button class="btn btn-primary btn-sm" onclick="Router.navigate('/read/${b.id}')">
+                      READ
+                    </button>
+                    ${b.webViewLink ? `
+                      <a href="${b.webViewLink}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm btn-icon" title="Open in Google Drive" style="margin-left: 4px;">
+                        <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                      </a>
+                    ` : ''}
                   </td>
                 </tr>
               `;
@@ -323,40 +312,11 @@ const Library = {
   },
 
   async cacheBook(fileId) {
-    const btn = document.querySelector(`.cache-btn[data-book-id="${fileId}"]`);
-    const original = btn ? btn.innerHTML : null;
-    if (btn) {
-      btn.classList.add('btn-progress');
-      btn.disabled = true;
-      btn.innerHTML = 'CACHING...';
-    }
-
-    showToast('Caching Record', 'Downloading document to local archive...', 'info');
-    try {
-      await API.cacheBook(fileId);
-      showToast('Cache Complete', 'Document cached locally.', 'success');
-      await this.refreshStatus();
-      await this.loadFolder(State.currentFolderId);
-    } catch (err) {
-      showToast('Cache Failed', err.message, 'danger');
-    } finally {
-      if (btn && btn.isConnected) {
-        btn.classList.remove('btn-progress');
-        btn.disabled = false;
-        btn.innerHTML = original || 'CACHE';
-      }
-    }
+    Router.navigate(`/read/${fileId}`);
   },
 
   async deleteCache(fileId) {
-    try {
-      await API.deleteBookCache(fileId);
-      showToast('Cache Purged', 'Local copy removed.', 'info');
-      await this.refreshStatus();
-      await this.loadFolder(State.currentFolderId);
-    } catch (err) {
-      showToast('Error', err.message, 'danger');
-    }
+    showToast('Direct Stream', 'Documents stream directly from Google Drive. No disk cache used.', 'info');
   }
 };
 

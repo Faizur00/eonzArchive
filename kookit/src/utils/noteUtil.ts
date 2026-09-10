@@ -46,15 +46,15 @@ export const buildHighlightStyleForType = (
   }
   const color =
     styleType === "background"
-      ? (forPDFOverlay ? rawColor : hexToRgba(rawColor, 0.85))
+      ? (forPDFOverlay ? hexToRgba(rawColor, 0.55) : hexToRgba(rawColor, 0.85))
       : rawColor;
 
   switch (styleType) {
     case "background":
       if (forPDFOverlay) {
-        return `background-color: ${color} !important; mix-blend-mode: multiply !important; opacity: 0.65 !important;`;
+        return `background-color: ${color} !important;`;
       }
-      return `background-color: ${color} !important;`;
+      return `background-color: ${rawColor} !important; color: #18181b !important; border-radius: 2px !important; padding: 1px 0 !important; -webkit-box-decoration-break: clone !important; box-decoration-break: clone !important;`;
     case "underline":
       if (isVertical && !forPDFOverlay) {
         return `border-right: 2.5px solid ${color} !important; background-color: transparent !important;`;
@@ -679,7 +679,8 @@ export const highlightRange = (
           "style",
           buildHighlightStyleForType(colorCode, false, isVerticalLayout())
         );
-        span.setAttribute("class", "kookit-note");
+        span.setAttribute("class", "kookit-note " + colorCode);
+        span.setAttribute("data-color", String(colorCode));
         span.setAttribute("data-key", noteKey);
         if (isNote && noteContent) {
           span.setAttribute("data-note-content", noteContent);
@@ -721,7 +722,8 @@ export const highlightRange = (
       "style",
       buildHighlightStyleForType(colorCode, false, isVerticalLayout())
     );
-    span.setAttribute("class", "kookit-note");
+    span.setAttribute("class", "kookit-note " + colorCode);
+    span.setAttribute("data-color", String(colorCode));
     span.setAttribute("data-key", noteKey);
     if (isNote && noteContent) {
       span.setAttribute("data-note-content", noteContent);

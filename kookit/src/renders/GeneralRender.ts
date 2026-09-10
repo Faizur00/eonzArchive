@@ -1159,18 +1159,18 @@ class GeneralRender extends EventEmitter {
     return charRange;
   }
   async renderHighlighters(notes: any[], handleNoteClick: any) {
-    if (!notes || notes.length === 0) return;
-    const clonedNotes = [...notes].reverse();
     let doc = this.getDocument();
     let iframe = this.getIframe();
     if (!doc || !iframe) return;
     clearHighlight(doc);
+    if (!notes || notes.length === 0) return;
+    const clonedNotes = [...notes].reverse();
 
     const currentChapter = this.tempLocation?.chapterDocIndex;
     const filteredNotes = clonedNotes.filter((item) => {
       if (item.chapterIndex === undefined || item.chapterIndex === null) return true;
       if (currentChapter === undefined || currentChapter === null) return true;
-      return item.chapterIndex === currentChapter;
+      return String(item.chapterIndex) === String(currentChapter);
     });
 
     const batchItems = filteredNotes.map((item) => ({

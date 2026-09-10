@@ -254,7 +254,11 @@ const Reader = {
 
     try {
       const startTime = Date.now();
-      const res = await fetch(`/api/book/${fileId}/stream`);
+      const headers = {};
+      if (window.__API_TOKEN) {
+        headers['X-Request-Token'] = window.__API_TOKEN;
+      }
+      const res = await fetch(`/api/book/${fileId}/stream`, { headers });
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
 
       const buffer = await res.arrayBuffer();
@@ -376,19 +380,24 @@ const Reader = {
           this.applyReadingStyles();
           this.attachIframeInterceptors(rendition);
           if (window.Annotations) {
-            if (chapterDocIndex !== undefined && chapterDocIndex !== null) {
-              Annotations.currentChapterDocIndex = parseInt(chapterDocIndex, 10) || 0;
-            }
+            const activeChapter = chapterDocIndex !== undefined && chapterDocIndex !== null
+              ? (parseInt(chapterDocIndex, 10) || 0)
+              : (rendition.tempLocation?.chapterDocIndex !== undefined
+                  ? parseInt(rendition.tempLocation.chapterDocIndex, 10) || 0
+                  : Annotations.currentChapterDocIndex);
+            Annotations.currentChapterDocIndex = activeChapter;
             Annotations.renderAllForCurrentPage();
           }
         });
         rendition.on('page-changed', () => {
           this.onPageChanged();
+          this.attachIframeInterceptors(rendition);
         });
       }
 
       this.savePositionNow();
       this.applyReadingStyles();
+      this.attachIframeInterceptors(rendition);
       if (window.Annotations) Annotations.renderAllForCurrentPage();
     } finally {
       State.isBuildingRendition = false;
@@ -397,6 +406,8 @@ const Reader = {
   },
 
   attachIframeInterceptors(rendition) {
+    if (!rendition) return;
+
     const epubDoc = rendition.getDocument && rendition.getDocument();
     const epubIframe = rendition.getIframe && rendition.getIframe();
     
@@ -404,14 +415,29 @@ const Reader = {
       Annotations.attachSelectionListeners(epubDoc, epubIframe);
     }
 
+    // PDF pages render inside nested sub-iframes (e.g. #pdf-iframe-0, #pdf-iframe-1)
+    if (epubDoc) {
+      const subIframes = epubDoc.querySelectorAll('iframe');
+      subIframes.forEach((subIfr) => {
+        try {
+          const subDoc = subIfr.contentDocument;
+          if (subDoc && window.Annotations) {
+            Annotations.attachSelectionListeners(subDoc, subIfr);
+          }
+        } catch (e) {}
+      });
+    }
+
     if (rendition && typeof rendition.getAllDocuments === 'function') {
       const allDocs = rendition.getAllDocuments();
-      allDocs.forEach((d) => {
-        if (d && window.Annotations) {
-          const ifr = d.defaultView ? d.defaultView.frameElement : null;
-          Annotations.attachSelectionListeners(d, ifr);
-        }
-      });
+      if (Array.isArray(allDocs)) {
+        allDocs.forEach((d) => {
+          if (d && window.Annotations) {
+            const ifr = d.defaultView ? d.defaultView.frameElement : null;
+            Annotations.attachSelectionListeners(d, ifr);
+          }
+        });
+      }
     }
 
     if (!epubDoc || !epubIframe || epubDoc.__kookitEventsAttached) return;
@@ -527,22 +553,25 @@ const Reader = {
       .kookit-note {
         cursor: pointer !important;
         border-radius: 2px !important;
+        padding: 1px 0 !important;
+        -webkit-box-decoration-break: clone !important;
+        box-decoration-break: clone !important;
       }
       .kookit-note.color-0, .kookit-note[data-color="color-0"] {
-        background-color: rgba(254, 240, 138, 0.45) !important;
-        color: inherit !important;
+        background-color: #fef08a !important;
+        color: #18181b !important;
       }
       .kookit-note.color-1, .kookit-note[data-color="color-1"] {
-        background-color: rgba(187, 247, 208, 0.45) !important;
-        color: inherit !important;
+        background-color: #bbf7d0 !important;
+        color: #18181b !important;
       }
       .kookit-note.color-2, .kookit-note[data-color="color-2"] {
-        background-color: rgba(153, 246, 228, 0.45) !important;
-        color: inherit !important;
+        background-color: #99f6e4 !important;
+        color: #18181b !important;
       }
       .kookit-note.color-3, .kookit-note[data-color="color-3"] {
-        background-color: rgba(186, 230, 253, 0.45) !important;
-        color: inherit !important;
+        background-color: #bae6fd !important;
+        color: #18181b !important;
       }
       .kookit-note.line-0, .kookit-note[data-color="line-0"] {
         border-bottom: 2.5px solid #ef4444 !important;

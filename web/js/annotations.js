@@ -122,10 +122,18 @@ const Annotations = {
   },
 
   bindEvents() {
+    // Prevent focus loss from iframe when clicking selection toolbar
+    if (this.selectionToolbar) {
+      this.selectionToolbar.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+      });
+    }
+
     // 1. Floating Selection Toolbar Events
     this.selectionToolbar.querySelectorAll('.color-swatch-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
+        e.preventDefault();
         const color = btn.getAttribute('data-color');
         this.applyHighlightToCurrentSelection(color);
       });
@@ -381,20 +389,20 @@ const Annotations = {
   getHighlightStyleCss(colorCode) {
     switch (colorCode) {
       case 'color-0':
-        return 'background-color: rgba(254, 240, 138, 0.45) !important; color: inherit !important; border-radius: 2px;';
+        return 'background-color: #fef08a !important; color: #18181b !important; border-radius: 2px; padding: 1px 0; -webkit-box-decoration-break: clone; box-decoration-break: clone;';
       case 'color-1':
-        return 'background-color: rgba(187, 247, 208, 0.45) !important; color: inherit !important; border-radius: 2px;';
+        return 'background-color: #bbf7d0 !important; color: #18181b !important; border-radius: 2px; padding: 1px 0; -webkit-box-decoration-break: clone; box-decoration-break: clone;';
       case 'color-2':
-        return 'background-color: rgba(153, 246, 228, 0.45) !important; color: inherit !important; border-radius: 2px;';
+        return 'background-color: #99f6e4 !important; color: #18181b !important; border-radius: 2px; padding: 1px 0; -webkit-box-decoration-break: clone; box-decoration-break: clone;';
       case 'color-3':
-        return 'background-color: rgba(186, 230, 253, 0.45) !important; color: inherit !important; border-radius: 2px;';
+        return 'background-color: #bae6fd !important; color: #18181b !important; border-radius: 2px; padding: 1px 0; -webkit-box-decoration-break: clone; box-decoration-break: clone;';
       case 'line-0':
         return 'border-bottom: 2.5px solid #ef4444 !important; background-color: transparent !important;';
       default:
         if (colorCode && (colorCode.startsWith('#') || colorCode.startsWith('rgb'))) {
-          return `background-color: ${colorCode} !important; color: inherit !important; border-radius: 2px;`;
+          return `background-color: ${colorCode} !important; color: #18181b !important; border-radius: 2px;`;
         }
-        return 'background-color: rgba(254, 240, 138, 0.45) !important; color: inherit !important; border-radius: 2px;';
+        return 'background-color: #fef08a !important; color: #18181b !important; border-radius: 2px;';
     }
   },
 
@@ -402,20 +410,8 @@ const Annotations = {
     if (!doc || doc.__annotEventsAttached) return;
     doc.__annotEventsAttached = true;
 
-    // Detect when text is deselected / unblocked
-    doc.addEventListener('selectionchange', () => {
-      const sel = doc.getSelection();
-      if (!sel || sel.isCollapsed || !sel.toString().trim()) {
-        this.hideSelectionToolbar();
-      }
-    });
-
     doc.addEventListener('mousedown', (e) => {
-      // If clicking inside the document, check if selection is empty and hide toolbar
-      const sel = doc.getSelection();
-      if (!sel || sel.isCollapsed || !sel.toString().trim()) {
-        this.hideSelectionToolbar();
-      }
+      this.hideSelectionToolbar();
     });
 
     const handleSelectionEnd = (e) => {
@@ -445,13 +441,48 @@ const Annotations = {
         return;
       }
 
-      const iframeRect = iframe ? iframe.getBoundingClientRect() : { left: 0, top: 0 };
-      const absLeft = iframeRect.left + rect.left + rect.width / 2;
-      const absTop = iframeRect.top + rect.top - 10;
+      // Detect chapter/page index if this is a PDF sub-iframe (id="pdf-iframe-21")
+      if (iframe && iframe.id && iframe.id.startsWith('pdf-iframe-')) {
+        const pageIdx = parseInt(iframe.id.replace('pdf-iframe-', ''), 10);
+        if (!isNaN(pageIdx)) {
+          this.currentChapterDocIndex = pageIdx;
+        }
+      }
+
+      // Compute true viewport coordinates across nested iframes (PDF pages)
+      let curEl = iframe;
+      let offsetLeft = 0;
+      let offsetTop = 0;
+      while (curEl) {
+        const r = curEl.getBoundingClientRect();
+        offsetLeft += r.left;
+        offsetTop += r.top;
+        try {
+          const pDoc = curEl.ownerDocument;
+          const pWin = pDoc ? pDoc.defaultView : null;
+          curEl = pWin && pWin.frameElement ? pWin.frameElement : null;
+        } catch (err) {
+          break;
+        }
+      }
+
+      const absLeft = offsetLeft + rect.left + rect.width / 2;
+      const absTop = offsetTop + rect.top - 10;
 
       this.currentSelectedText = selectedText;
       this.currentSelectionRange = selection.getRangeAt(0);
       this.currentSelectionRect = { left: absLeft, top: absTop, height: rect.height };
+
+      // Cache highlight range coordinates while selection is active
+      if (State.currentRendition && typeof State.currentRendition.getHightlightCoords === 'function') {
+        const isPdf = State.currentBook && State.currentBook.format === 'PDF';
+        const fetchPromise = isPdf
+          ? State.currentRendition.getHightlightCoords(this.currentChapterDocIndex)
+          : State.currentRendition.getHightlightCoords();
+        fetchPromise.then(data => {
+          if (data) this.currentSavedRangeData = data;
+        }).catch(() => {});
+      }
 
       this.showSelectionToolbar(absLeft, absTop);
     };
@@ -464,21 +495,22 @@ const Annotations = {
   showSelectionToolbar(centerX, topY) {
     if (!this.selectionToolbar) return;
     this.selectionToolbar.style.display = 'flex';
+    this.selectionToolbar.style.visibility = 'visible';
+    this.selectionToolbar.style.opacity = '1';
+    this.selectionToolbar.style.zIndex = '9999';
     
-    requestAnimationFrame(() => {
-      const tbWidth = this.selectionToolbar.offsetWidth || 180;
-      const tbHeight = this.selectionToolbar.offsetHeight || 38;
-      
-      let left = centerX - tbWidth / 2;
-      let top = topY - tbHeight - 6;
+    const tbWidth = this.selectionToolbar.offsetWidth || 180;
+    const tbHeight = this.selectionToolbar.offsetHeight || 38;
+    
+    let left = centerX - tbWidth / 2;
+    let top = topY - tbHeight - 6;
 
-      if (left < 10) left = 10;
-      if (left + tbWidth > window.innerWidth - 10) left = window.innerWidth - tbWidth - 10;
-      if (top < 10) top = topY + (this.currentSelectionRect?.height || 20) + 8;
+    if (left < 10) left = 10;
+    if (left + tbWidth > window.innerWidth - 10) left = window.innerWidth - tbWidth - 10;
+    if (top < 10) top = topY + (this.currentSelectionRect?.height || 20) + 8;
 
-      this.selectionToolbar.style.left = `${left}px`;
-      this.selectionToolbar.style.top = `${top}px`;
-    });
+    this.selectionToolbar.style.left = `${left}px`;
+    this.selectionToolbar.style.top = `${top}px`;
   },
 
   hideSelectionToolbar() {
@@ -506,9 +538,16 @@ const Annotations = {
       console.warn('Failed to retrieve highlight coordinates:', e);
     }
 
+    if (!rangeData && this.currentSavedRangeData) {
+      rangeData = this.currentSavedRangeData;
+    }
+
     if (!rangeData) {
+      console.warn('No range data available for highlight');
       return;
     }
+
+    this.currentSavedRangeData = null;
 
     const annotation = {
       id: noteKey,
@@ -534,9 +573,17 @@ const Annotations = {
     const rendition = State.currentRendition;
     const isPdf = State.currentBook && State.currentBook.format === 'PDF';
     
+    const currentChapter = (rendition.tempLocation?.chapterDocIndex !== undefined)
+      ? (parseInt(rendition.tempLocation.chapterDocIndex, 10) || 0)
+      : this.currentChapterDocIndex;
+
     const highlights = isPdf
       ? this.items.filter(i => i.type === 'highlight')
-      : this.items.filter(i => i.type === 'highlight' && (i.chapterDocIndex === undefined || i.chapterDocIndex === this.currentChapterDocIndex));
+      : this.items.filter(i => i.type === 'highlight' && (
+          i.chapterDocIndex === undefined || 
+          i.chapterDocIndex === null || 
+          String(i.chapterDocIndex) === String(currentChapter)
+        ));
 
     const handleNoteClick = (e) => {
       // Highlight clicked
@@ -560,6 +607,18 @@ const Annotations = {
     this.enforceHighlightStyles();
     setTimeout(() => this.enforceHighlightStyles(), 60);
     setTimeout(() => this.enforceHighlightStyles(), 200);
+  },
+
+  hexToRgba(hexColor, alpha) {
+    const hex = String(hexColor || '').replace('#', '');
+    if (hex.length === 3) {
+      return this.hexToRgba(hex.split('').map(ch => ch + ch).join(''), alpha);
+    }
+    if (hex.length !== 6) return hexColor;
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   },
 
   getPdfHighlightBg(colorCode) {
@@ -590,7 +649,18 @@ const Annotations = {
 
     if (typeof rendition.getDocument === 'function') {
       const d = rendition.getDocument();
-      if (d) docs.push(d);
+      if (d) {
+        docs.push(d);
+        // Include nested iframes (PDF page iframes)
+        const subIframes = d.querySelectorAll('iframe');
+        subIframes.forEach(sub => {
+          try {
+            if (sub.contentDocument && !docs.includes(sub.contentDocument)) {
+              docs.push(sub.contentDocument);
+            }
+          } catch (e) {}
+        });
+      }
     }
     if (typeof rendition.getAllDocuments === 'function') {
       const allDocs = rendition.getAllDocuments();
@@ -606,15 +676,20 @@ const Annotations = {
         const key = el.getAttribute('data-key');
         const item = this.items.find(i => i.id === key);
         if (item) {
-          el.classList.add(item.color);
           if (!isPdf) {
+            el.classList.add(item.color);
+            el.setAttribute('data-color', item.color);
             el.style.cssText = this.getHighlightStyleCss(item.color);
           } else {
-            // For PDF overlay divs, preserve coordinates and only ensure vivid background color and blend mode
+            // For PDF overlay divs, preserve coordinates and render a plain
+            // semi-transparent background (no multiply blend, which looks muddy).
+            // Do not add the color class/data-color here: the injected
+            // .kookit-note[data-color=...] rules use full-opacity !important
+            // and would override this softer inline background.
             const bg = this.getPdfHighlightBg(item.color);
-            el.style.backgroundColor = bg;
-            el.style.mixBlendMode = 'multiply';
-            el.style.opacity = '0.45';
+            el.style.backgroundColor = this.hexToRgba(bg, 0.55);
+            el.style.mixBlendMode = 'normal';
+            el.style.opacity = '1';
             el.style.zIndex = '2';
             el.style.pointerEvents = 'auto';
           }

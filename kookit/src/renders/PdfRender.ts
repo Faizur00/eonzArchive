@@ -792,6 +792,15 @@ class PdfRender extends GeneralRender {
     return { page: pageIndex, coords: selected, readerMode: this.readerMode };
   }
   async renderHighlighters(notes: any[], handleNoteClick: any) {
+    let outerDoc = this.getDocument();
+    if (outerDoc) {
+      const allSubIframes = outerDoc.querySelectorAll('iframe[id^="pdf-iframe-"]');
+      allSubIframes.forEach((ifr: any) => {
+        try {
+          if (ifr.contentDocument) clearHighlight(ifr.contentDocument);
+        } catch (e) {}
+      });
+    }
     if (!notes || notes.length === 0) return;
     const clonedNotes = [...notes].reverse();
 

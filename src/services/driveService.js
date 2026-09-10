@@ -10,9 +10,8 @@ const {
 } = require('../utils/gdriveHelper');
 
 class DriveService {
-  constructor(projectRoot, cacheService) {
+  constructor(projectRoot) {
     this.projectRoot = projectRoot;
-    this.cacheService = cacheService;
     this.dataFile = path.resolve(projectRoot, 'data', 'library.json');
     this.driveClient = null;
     this.authClient = null;
@@ -145,7 +144,7 @@ class DriveService {
     const keyDetected = !!keyFile
       || !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON
       || !!(process.env.GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL && process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY);
-    const cacheStats = this.cacheService.getCacheStats();
+    const cacheStats = { count: 0, totalBytes: 0, totalBytesFormatted: '0 B', files: [] };
 
     let rootStatus = {
       id: this.rootFolderId,
@@ -184,16 +183,13 @@ class DriveService {
     const books = this.libraryData.books || [];
     const folders = this.libraryData.folders || [];
     const totalSizeBytes = books.reduce((acc, b) => acc + (parseInt(b.size) || 0), 0);
-    
-    // Count cached books
-    const cachedCount = books.filter(b => this.cacheService.findCachedFile(b.id).exists).length;
 
     return {
       totalBooks: books.length,
       totalFolders: folders.length,
       totalSizeBytes,
       totalSizeFormatted: formatBytes(totalSizeBytes),
-      cachedBooksCount: cachedCount
+      cachedBooksCount: 0
     };
   }
 
@@ -363,17 +359,14 @@ class DriveService {
     const allFolders = this.libraryData.folders || [];
     const allBooks = this.libraryData.books || [];
 
-    // Attach cache status to all books dynamically
-    const enrichedBooks = allBooks.map(b => {
-      const cacheStatus = this.cacheService.findCachedFile(b.id);
-      return {
-        ...b,
-        cached: cacheStatus.exists,
-        cachedSize: cacheStatus.size,
-        cachedSizeFormatted: cacheStatus.sizeFormatted,
-        cachedAt: cacheStatus.cachedAt
-      };
-    });
+    // All books are streamed on-demand directly from Google Drive (0 MB server disk cache)
+    const enrichedBooks = allBooks.map(b => ({
+      ...b,
+      cached: false,
+      cachedSize: 0,
+      cachedSizeFormatted: '0 B',
+      cachedAt: null
+    }));
 
     // Check if flat search or filter is requested
     const { search, format, cachedOnly, sort } = query;
@@ -464,40 +457,28 @@ class DriveService {
   getBookById(fileId) {
     const book = (this.libraryData.books || []).find(b => b.id === fileId);
     if (!book) return null;
-    const cacheStatus = this.cacheService.findCachedFile(fileId);
     return {
       ...book,
-      cached: cacheStatus.exists,
-      cachedPath: cacheStatus.path,
-      cachedSize: cacheStatus.size,
-      cachedSizeFormatted: cacheStatus.sizeFormatted,
-      cachedAt: cacheStatus.cachedAt
+      cached: false,
+      cachedPath: null,
+      cachedSize: 0,
+      cachedSizeFormatted: '0 B',
+      cachedAt: null
     };
   }
 
   /**
-   * Ensure book is downloaded/cached, and return local file path or stream
+   * Direct stream from Google Drive with HTTP Range support (stateless proxy, zero disk cache)
    */
-  async getBookFile(fileId) {
-    let book = this.getBookById(fileId);
-    const cached = this.cacheService.findCachedFile(fileId);
-
-    if (cached.exists && cached.path) {
-      return {
-        source: 'cache',
-        path: cached.path,
-        filename: cached.filename,
-        size: cached.size,
-        mimeType: book?.mimeType || 'application/octet-stream',
-        book
-      };
-    }
-
+  async getDriveStream(fileId, rangeHeader = null) {
     if (!this.driveClient) {
-      throw new Error('Google Drive client is not initialized.');
+      this.init();
+      if (!this.driveClient) {
+        throw new Error('Google Drive client is not initialized.');
+      }
     }
 
-    // If metadata not in library, fetch from GDrive
+    let book = (this.libraryData.books || []).find(b => b.id === fileId);
     if (!book) {
       const meta = await this.driveClient.files.get({
         fileId,
@@ -513,26 +494,24 @@ class DriveService {
       };
     }
 
-    console.log(`📥 On-demand caching book from Google Drive: "${book.name}" (${fileId})...`);
+    const requestHeaders = {};
+    if (rangeHeader) {
+      requestHeaders.Range = rangeHeader;
+    }
 
-    // Stream download from Google Drive
     const driveRes = await this.driveClient.files.get(
       { fileId, alt: 'media', supportsAllDrives: true },
-      { responseType: 'stream' }
+      { responseType: 'stream', headers: requestHeaders }
     );
 
-    // Save to local cache atomically
-    const saved = await this.cacheService.saveStreamToCache(fileId, book.name, driveRes.data);
-    console.log(`✅ Cached book locally: "${book.name}" (${saved.sizeFormatted})`);
+    return { driveRes, book };
+  }
 
-    return {
-      source: 'downloaded',
-      path: saved.path,
-      filename: saved.filename,
-      size: saved.size,
-      mimeType: book.mimeType || 'application/octet-stream',
-      book
-    };
+  /**
+   * Backwards-compatible accessor for book stream
+   */
+  async getBookFile(fileId) {
+    return this.getDriveStream(fileId);
   }
 }
 

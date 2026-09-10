@@ -5,7 +5,6 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 
-const CacheService = require('./src/services/cacheService');
 const DriveService = require('./src/services/driveService');
 const AnnotationService = require('./src/services/annotationService');
 
@@ -40,9 +39,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// Require the request token on all API calls.
+// Require the request token on all API calls (via header or query parameter).
 app.use('/api', (req, res, next) => {
-  const token = req.headers['x-request-token'];
+  const token = req.headers['x-request-token'] || req.query.token;
   if (typeof token !== 'string' || token !== API_TOKEN) {
     return res.status(401).json({ success: false, error: 'Unauthorized' });
   }
@@ -50,8 +49,7 @@ app.use('/api', (req, res, next) => {
 });
 
 // Initialize Services
-const cacheService = new CacheService(PROJECT_ROOT);
-const driveService = new DriveService(PROJECT_ROOT, cacheService);
+const driveService = new DriveService(PROJECT_ROOT);
 const annotationService = new AnnotationService(PROJECT_ROOT);
 
 // Serve the SPA shell with the API token embedded for the same-origin frontend.
@@ -161,60 +159,38 @@ app.get('/api/book/:id/info', (req, res) => {
 });
 
 /**
- * POST /api/book/:id/cache - Pre-cache a book on demand without streaming to client
+ * POST /api/book/:id/cache - Pre-cache endpoint stub (zero disk cache mode)
  */
-app.post('/api/book/:id/cache', async (req, res) => {
-  try {
-    const result = await driveService.getBookFile(req.params.id);
-    res.json({
-      success: true,
-      message: 'Book successfully cached',
-      data: {
-        id: req.params.id,
-        filename: result.filename,
-        size: result.size,
-        source: result.source
-      }
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+app.post('/api/book/:id/cache', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Server-side disk caching is disabled. Documents stream directly from Google Drive.',
+    data: { id: req.params.id, size: 0, source: 'stream' }
+  });
 });
 
 /**
- * DELETE /api/book/:id/cache - Delete cached file for a book
+ * DELETE /api/book/:id/cache - Delete cached file endpoint stub (zero disk cache mode)
  */
 app.delete('/api/book/:id/cache', (req, res) => {
-  try {
-    const result = cacheService.deleteCache(req.params.id);
-    res.json({ success: true, data: result });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+  res.json({ success: true, data: { success: true, deleted: false } });
 });
 
 /**
- * GET /api/cache/stats - Get cache usage details
+ * GET /api/cache/stats - Cache usage details (0 B on disk)
  */
 app.get('/api/cache/stats', (req, res) => {
-  try {
-    const stats = cacheService.getCacheStats();
-    res.json({ success: true, data: stats });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+  res.json({
+    success: true,
+    data: { count: 0, totalBytes: 0, totalBytesFormatted: '0 B', files: [] }
+  });
 });
 
 /**
- * DELETE /api/cache - Clear all cached books
+ * DELETE /api/cache - Clear cache endpoint stub (0 B on disk)
  */
 app.delete('/api/cache', (req, res) => {
-  try {
-    const result = cacheService.clearAllCache();
-    res.json({ success: true, data: result });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+  res.json({ success: true, data: { success: true, count: 0 } });
 });
 
 /**
@@ -261,60 +237,71 @@ app.delete('/api/book/:id/annotations/:annotationId', (req, res) => {
 });
 
 /**
- * GET /api/book/:id/stream - Stream book content to browser / reader (caches on demand)
+ * GET /api/book/:id/stream - Stream book content directly from Google Drive (zero disk cache)
  */
 app.get('/api/book/:id/stream', async (req, res) => {
   try {
-    const bookFile = await driveService.getBookFile(req.params.id);
-    const filePath = bookFile.path;
-
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ success: false, error: 'File not found on disk cache' });
-    }
-
-    const stat = fs.statSync(filePath);
-    const fileSize = stat.size;
+    const fileId = req.params.id;
     const range = req.headers.range;
 
+    const { driveRes, book } = await driveService.getDriveStream(fileId, range);
+
     // Determine content type
-    let contentType = bookFile.mimeType || 'application/octet-stream';
-    const ext = path.extname(filePath).toLowerCase();
+    let contentType = book.mimeType || 'application/octet-stream';
+    const ext = path.extname(book.name || '').toLowerCase();
     if (ext === '.epub') contentType = 'application/epub+zip';
     else if (ext === '.pdf') contentType = 'application/pdf';
     else if (ext === '.mobi') contentType = 'application/x-mobipocket-ebook';
     else if (ext === '.txt') contentType = 'text/plain; charset=utf-8';
     else if (ext === '.md') contentType = 'text/markdown; charset=utf-8';
 
-    // Support HTTP Range requests (crucial for large PDF rendering, audio, etc.)
-    if (range) {
-      const parts = range.replace(/bytes=/, "").split("-");
-      const start = parseInt(parts[0], 10);
-      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-      const chunksize = (end - start) + 1;
-      const file = fs.createReadStream(filePath, { start, end });
+    // Support HTTP Range requests (crucial for PDF.js / large document streaming)
+    if (driveRes.status === 206) {
+      const contentRange = driveRes.headers.get ? driveRes.headers.get('content-range') : driveRes.headers['content-range'];
+      const contentLength = driveRes.headers.get ? driveRes.headers.get('content-length') : driveRes.headers['content-length'];
+
       const head = {
-        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-        'Accept-Ranges': 'bytes',
-        'Content-Length': chunksize,
         'Content-Type': contentType,
-        'X-Cache-Source': bookFile.source
+        'Accept-Ranges': 'bytes',
+        'X-Cache-Source': 'drive-direct'
       };
+      if (contentRange) head['Content-Range'] = contentRange;
+      if (contentLength) head['Content-Length'] = contentLength;
+
       res.writeHead(206, head);
-      file.pipe(res);
     } else {
+      const contentLength = (driveRes.headers.get ? driveRes.headers.get('content-length') : driveRes.headers['content-length']) || (book.size ? String(book.size) : undefined);
       const head = {
-        'Content-Length': fileSize,
         'Content-Type': contentType,
         'Accept-Ranges': 'bytes',
-        'Content-Disposition': `inline; filename="${encodeURIComponent(bookFile.book?.name || bookFile.filename)}"`,
-        'X-Cache-Source': bookFile.source
+        'Content-Disposition': `inline; filename="${encodeURIComponent(book.name || fileId)}"`,
+        'X-Cache-Source': 'drive-direct'
       };
+      if (contentLength) head['Content-Length'] = contentLength;
+
       res.writeHead(200, head);
-      fs.createReadStream(filePath).pipe(res);
     }
+
+    // Abort Google Drive request if client aborts early
+    req.on('close', () => {
+      if (driveRes.data && !driveRes.data.destroyed) {
+        driveRes.data.destroy();
+      }
+    });
+
+    driveRes.data.on('error', (streamErr) => {
+      console.error(`Stream error for "${book.name}":`, streamErr.message);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, error: streamErr.message });
+      }
+    });
+
+    driveRes.data.pipe(res);
   } catch (err) {
-    console.error('Error streaming book:', err.message);
-    res.status(500).json({ success: false, error: err.message });
+    console.error('Error streaming book from Drive:', err.message);
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, error: err.message });
+    }
   }
 });
 

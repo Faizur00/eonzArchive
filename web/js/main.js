@@ -96,13 +96,13 @@ async function refreshStorageModalData() {
 
   try {
     const status = await API.getStatus();
-    const stats = status.cacheStats;
+    const stats = status.cacheStats || { totalBytesFormatted: '0 B', count: 0 };
     body.innerHTML = `
       <div style="display:flex; flex-direction:column; gap:16px;">
         <div style="background:var(--bg-surface-subtle); padding:16px; border-radius:var(--radius-md); border:1px solid var(--border-subtle);">
-          <div style="font-size:12px; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Local Disk Usage</div>
-          <div style="font-size:24px; font-weight:700; color:var(--text-primary); margin:4px 0 8px;">${stats.totalBytesFormatted}</div>
-          <div style="font-size:13px; color:var(--text-secondary);">${stats.count} books cached on local storage</div>
+          <div style="font-size:12px; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Storage Architecture</div>
+          <div style="font-size:20px; font-weight:700; color:var(--text-primary); margin:4px 0 8px;">Direct Drive Streaming</div>
+          <div style="font-size:13px; color:var(--text-secondary);">Stateless proxy streaming directly from Google Drive. 0 MB server disk used.</div>
         </div>
 
         <div style="display:flex; flex-direction:column; gap:8px; font-size:13px;">
