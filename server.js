@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
+const { rateLimit } = require('express-rate-limit');
 
 const DriveService = require('./src/services/driveService');
 const AnnotationService = require('./src/services/annotationService');
@@ -17,7 +18,33 @@ const PROJECT_ROOT = __dirname;
 // The server embeds the token into the served index.html so the same-origin UI can send it.
 // A cross-origin page cannot read the HTML (no CORS) and cannot attach the header without a
 // preflight (which the server rejects), so this blocks both data exfiltration and CSRF.
-const API_TOKEN = process.env.API_TOKEN || crypto.randomBytes(32).toString('hex');
+const API_TOKEN = process.env.API_TOKEN || crypto.randomBytes(64).toString('hex');
+
+function isWeakToken(token) {
+  if (!token || typeof token !== 'string') return true;
+  if (token.length < 32) return true;
+
+  const lower = token.toLowerCase();
+  const commonWeakWords = [
+    'change-me', 'secret', 'password', 'admin', 'token', 'test',
+    'default', 'demo', 'archive', 'eonz', 'faizur', 'user',
+    'welcome', 'qwerty', '123456'
+  ];
+  if (commonWeakWords.some(word => lower.includes(word))) return true;
+  if (/^[a-zA-Z]+$/.test(token)) return true;
+  if (/^[a-zA-Z]+[0-9]+$/.test(token)) return true;
+  if (/(\b(19\d\d|20\d\d)\b|\d{6,8})/.test(token) && !/^[0-9a-fA-F]{64,}$/.test(token)) return true;
+
+  const uniqueChars = new Set(lower).size;
+  if (uniqueChars < 8) return true;
+
+  return false;
+}
+
+if (process.env.API_TOKEN && isWeakToken(process.env.API_TOKEN)) {
+  console.warn('\x1b[33m⚠️  [SECURITY WARNING] API_TOKEN appears weak, dictionary-based, or contains common patterns.\x1b[0m');
+  console.warn('\x1b[33m   Generate a cryptographically secure token with: openssl rand -hex 32\x1b[0m');
+}
 
 // Host allowlist defeats DNS-rebinding attacks. Defaults to loopback aliases; extend via ALLOWED_HOSTS.
 const allowedHosts = new Set(
@@ -47,6 +74,57 @@ app.use('/api', (req, res, next) => {
   }
   next();
 });
+
+// Rate limiters (Step 2, Step 6)
+function createLimiter({ windowMs, limit, message }) {
+  return rateLimit({
+    windowMs,
+    limit,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { success: false, error: message },
+    handler: (req, res, next, options) => {
+      if (req.rateLimit) {
+        res.setHeader('RateLimit-Limit', req.rateLimit.limit);
+        res.setHeader('RateLimit-Remaining', req.rateLimit.remaining);
+        res.setHeader('RateLimit-Reset', Math.ceil((new Date(req.rateLimit.resetTime).getTime() - Date.now()) / 1000));
+      }
+      res.status(options.statusCode).json(options.message);
+    }
+  });
+}
+
+const addRateLimitHeaders = (req, res, next) => {
+  if (req.rateLimit) {
+    res.setHeader('RateLimit-Limit', req.rateLimit.limit);
+    res.setHeader('RateLimit-Remaining', req.rateLimit.remaining);
+    res.setHeader('RateLimit-Reset', Math.ceil((new Date(req.rateLimit.resetTime).getTime() - Date.now()) / 1000));
+  }
+  next();
+};
+
+const globalLimiter = createLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: 200,
+  message: 'Too many requests from this IP, please try again later.'
+});
+
+const streamLimiter = createLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  message: 'Too many stream requests from this IP, please try again later.'
+});
+
+const syncLimiter = createLimiter({
+  windowMs: 60 * 60 * 1000,
+  limit: 3,
+  message: 'Too many sync requests from this IP, please try again later.'
+});
+
+// Mount rate limiters after token verification
+app.use('/api', globalLimiter, addRateLimitHeaders);
+app.use('/api/book/:id/stream', streamLimiter, addRateLimitHeaders);
+app.use('/api/sync', syncLimiter, addRateLimitHeaders);
 
 // Initialize Services
 const driveService = new DriveService(PROJECT_ROOT);
@@ -93,7 +171,8 @@ app.get('/api/status', async (req, res) => {
  */
 app.post('/api/sync', async (req, res) => {
   try {
-    const result = await driveService.sync();
+    const force = req.query.force === 'true' || Boolean(req.body && req.body.force);
+    const result = await driveService.sync(force);
     res.json({ success: true, data: result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -300,7 +379,8 @@ app.get('/api/book/:id/stream', async (req, res) => {
   } catch (err) {
     console.error('Error streaming book from Drive:', err.message);
     if (!res.headersSent) {
-      res.status(500).json({ success: false, error: err.message });
+      const statusCode = err.statusCode || (err.message === 'Book not found in library' ? 404 : 500);
+      res.status(statusCode).json({ success: false, error: err.message });
     }
   }
 });

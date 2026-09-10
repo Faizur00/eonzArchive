@@ -9,6 +9,8 @@ const {
   isSupportedBook 
 } = require('../utils/gdriveHelper');
 
+const SYNC_COOLDOWN_MS = parseInt(process.env.SYNC_COOLDOWN_MS, 10) || 5 * 60 * 1000; // 5 minutes = 300000 ms
+
 class DriveService {
   constructor(projectRoot) {
     this.projectRoot = projectRoot;
@@ -199,6 +201,21 @@ class DriveService {
   async sync(force = false) {
     if (this.isSyncing) {
       return { status: 'in_progress', message: 'Sync already in progress' };
+    }
+
+    if (!force && this.lastSyncTime) {
+      const lastSyncMs = new Date(this.lastSyncTime).getTime();
+      if (!isNaN(lastSyncMs)) {
+        const elapsed = Date.now() - lastSyncMs;
+        if (elapsed < SYNC_COOLDOWN_MS) {
+          const retryAfterMs = SYNC_COOLDOWN_MS - elapsed;
+          return {
+            status: 'cooldown',
+            retryAfterMs,
+            message: `Sync is on cooldown. Try again in ${Math.ceil(retryAfterMs / 1000)}s.`
+          };
+        }
+      }
     }
 
     if (!this.driveClient) {
@@ -478,20 +495,11 @@ class DriveService {
       }
     }
 
-    let book = (this.libraryData.books || []).find(b => b.id === fileId);
+    const book = (this.libraryData.books || []).find(b => b.id === fileId);
     if (!book) {
-      const meta = await this.driveClient.files.get({
-        fileId,
-        fields: 'id, name, mimeType, size, modifiedTime',
-        supportsAllDrives: true
-      });
-      book = {
-        id: meta.data.id,
-        name: meta.data.name,
-        mimeType: meta.data.mimeType,
-        size: parseInt(meta.data.size || 0),
-        format: getBookFormat(meta.data.name, meta.data.mimeType)
-      };
+      const error = new Error('Book not found in library');
+      error.statusCode = 404;
+      throw error;
     }
 
     const requestHeaders = {};
