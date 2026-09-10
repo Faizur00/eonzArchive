@@ -52,6 +52,7 @@ const allowedHosts = new Set(
     .concat((process.env.ALLOWED_HOSTS || '').split(',').map(h => h.trim()).filter(Boolean))
 );
 
+app.set('trust proxy', 1);
 app.use(express.json());
 
 // Reject requests whose Host header is not allowed.
@@ -60,10 +61,15 @@ app.use((req, res, next) => {
   const host = hostRaw.startsWith('[')
     ? hostRaw.slice(0, hostRaw.indexOf(']') + 1)
     : hostRaw.split(':')[0];
-  if (!allowedHosts.has(host)) {
-    return res.status(403).json({ success: false, error: 'Forbidden host' });
+  if (
+    process.env.VERCEL ||
+    host.endsWith('.vercel.app') ||
+    allowedHosts.has(host) ||
+    process.env.DISABLE_HOST_CHECK === 'true'
+  ) {
+    return next();
   }
-  next();
+  return res.status(403).json({ success: false, error: 'Forbidden host' });
 });
 
 // Require the request token on all API calls (via header or query parameter).
@@ -130,9 +136,22 @@ app.use('/api/sync', syncLimiter, addRateLimitHeaders);
 const driveService = new DriveService(PROJECT_ROOT);
 const annotationService = new AnnotationService(PROJECT_ROOT);
 
+// Ensure library index is loaded from Redis/seed on cold starts
+app.use('/api', async (req, res, next) => {
+  try {
+    await driveService.ensureLibraryLoaded();
+  } catch (err) {
+    console.error('Error in ensureLibraryLoaded middleware:', err.message);
+  }
+  next();
+});
+
 // Serve the SPA shell with the API token embedded for the same-origin frontend.
 function serveApp(req, res) {
-  const html = fs.readFileSync(path.join(__dirname, 'web', 'index.html'), 'utf8');
+  const templatePath = fs.existsSync(path.join(__dirname, 'web', 'index.html'))
+    ? path.join(__dirname, 'web', 'index.html')
+    : path.join(__dirname, 'public', 'index.html');
+  const html = fs.readFileSync(templatePath, 'utf8');
   res.type('html').send(
     html.replace('</head>', `<script>window.__API_TOKEN = ${JSON.stringify(API_TOKEN)};</script></head>`)
   );
@@ -144,11 +163,18 @@ app.get('/library', (req, res) => res.redirect('/#/'));
 app.get('/folder/:id', (req, res) => res.redirect(`/#/folder/${encodeURIComponent(req.params.id)}`));
 app.get('/read/:id', (req, res) => res.redirect(`/#/read/${encodeURIComponent(req.params.id)}`));
 
-// Serve static frontend from web/ (index.html is handled by serveApp so the token is embedded)
+// Serve static frontend from public/ and web/ (index.html is handled by serveApp so the token is embedded)
+const publicDir = path.join(__dirname, 'public');
+if (fs.existsSync(publicDir)) {
+  app.use(express.static(publicDir, { index: false }));
+}
 app.use(express.static(path.join(__dirname, 'web'), { index: false }));
 
-// Serve kookit library assets if needed
+// Serve kookit library assets
 app.use('/kookit', express.static(path.join(__dirname, 'kookit')));
+if (fs.existsSync(path.join(publicDir, 'kookit'))) {
+  app.use('/kookit', express.static(path.join(publicDir, 'kookit')));
+}
 
 // -------------------------------------------------------------
 // API Endpoints
@@ -275,9 +301,9 @@ app.delete('/api/cache', (req, res) => {
 /**
  * GET /api/book/:id/annotations - Get all annotations for a specific book
  */
-app.get('/api/book/:id/annotations', (req, res) => {
+app.get('/api/book/:id/annotations', async (req, res) => {
   try {
-    const annotations = annotationService.getAnnotations(req.params.id);
+    const annotations = await annotationService.getAnnotations(req.params.id);
     res.json({ success: true, data: annotations });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -287,14 +313,14 @@ app.get('/api/book/:id/annotations', (req, res) => {
 /**
  * POST /api/book/:id/annotations - Save/sync annotations (single or list) for a book
  */
-app.post('/api/book/:id/annotations', (req, res) => {
+app.post('/api/book/:id/annotations', async (req, res) => {
   try {
     const body = req.body;
     if (Array.isArray(body)) {
-      const result = annotationService.saveAnnotations(req.params.id, body);
+      const result = await annotationService.saveAnnotations(req.params.id, body);
       return res.json({ success: true, data: result });
     } else if (body && typeof body === 'object') {
-      const saved = annotationService.upsertAnnotation(req.params.id, body);
+      const saved = await annotationService.upsertAnnotation(req.params.id, body);
       return res.json({ success: true, data: saved });
     }
     res.status(400).json({ success: false, error: 'Invalid annotations payload' });
@@ -306,9 +332,9 @@ app.post('/api/book/:id/annotations', (req, res) => {
 /**
  * DELETE /api/book/:id/annotations/:annotationId - Delete a single annotation
  */
-app.delete('/api/book/:id/annotations/:annotationId', (req, res) => {
+app.delete('/api/book/:id/annotations/:annotationId', async (req, res) => {
   try {
-    const result = annotationService.deleteAnnotation(req.params.id, req.params.annotationId);
+    const result = await annotationService.deleteAnnotation(req.params.id, req.params.annotationId);
     res.json({ success: true, data: result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -388,30 +414,34 @@ app.get('/api/book/:id/stream', async (req, res) => {
 // Fallback to the SPA shell (with embedded API token) for any unmatched route
 app.use(serveApp);
 
-// Start Server
-app.listen(PORT, HOST, async () => {
-  console.log(`🚀 Personal Ebook Archive Server running at http://${HOST}:${PORT}`);
-  console.log(`📖 Web UI accessible at http://localhost:${PORT}`);
+// Start Server when run directly
+if (require.main === module) {
+  app.listen(PORT, HOST, async () => {
+    console.log(`🚀 Personal Ebook Archive Server running at http://${HOST}:${PORT}`);
+    console.log(`📖 Web UI accessible at http://localhost:${PORT}`);
 
-  // Log every reachable address (LAN IP + any bridge/container IPs)
-  const addresses = [];
-  for (const ifaces of Object.values(os.networkInterfaces())) {
-    for (const iface of ifaces || []) {
-      if (iface.family === 'IPv4' && !iface.internal) {
-        addresses.push(iface.address);
+    // Log every reachable address (LAN IP + any bridge/container IPs)
+    const addresses = [];
+    for (const ifaces of Object.values(os.networkInterfaces())) {
+      for (const iface of ifaces || []) {
+        if (iface.family === 'IPv4' && !iface.internal) {
+          addresses.push(iface.address);
+        }
       }
     }
-  }
-  if (addresses.length > 0) {
-    for (const addr of addresses) {
-      console.log(`🌐 Reachable from other devices at http://${addr}:${PORT}`);
+    if (addresses.length > 0) {
+      for (const addr of addresses) {
+        console.log(`🌐 Reachable from other devices at http://${addr}:${PORT}`);
+      }
     }
-  }
 
-  // Perform an initial background sync if library is empty
-  const status = await driveService.getStatus();
-  if (status.stats.totalBooks === 0 && status.connected && status.rootFolder.id) {
-    console.log('🔄 Initial library empty. Running first sync with Google Drive...');
-    driveService.sync().catch(e => console.error('Initial sync error:', e.message));
-  }
-});
+    // Perform an initial background sync if library is empty
+    const status = await driveService.getStatus();
+    if (status.stats.totalBooks === 0 && status.connected && status.rootFolder.id) {
+      console.log('🔄 Initial library empty. Running first sync with Google Drive...');
+      driveService.sync().catch(e => console.error('Initial sync error:', e.message));
+    }
+  });
+}
+
+module.exports = app;

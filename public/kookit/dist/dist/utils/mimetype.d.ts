@@ -1,0 +1,33 @@
+export declare const mimetype: {
+    svg: string;
+    png: string;
+    jpg: string;
+    jpeg: string;
+    gif: string;
+    webp: string;
+    zip: string;
+    rar: string;
+    "7z": string;
+    tar: string;
+    html: string;
+    htm: string;
+    xml: string;
+    xhtml: string;
+    css: string;
+};
+export declare const mimetypeReverse: {
+    "image/svg+xml": string;
+    "image/png": string;
+    "image/jpeg": string;
+    "image/gif": string;
+    "image/webp": string;
+    "application/zip": string;
+    "application/x-rar-compressed": string;
+    "application/x-7z-compressed": string;
+    "application/x-tar": string;
+    "text/html": string;
+    "text/xml": string;
+    "application/xhtml+xml": string;
+    "text/css": string;
+};
+export declare const removeExtraQuestionMark: (html: any) => any;

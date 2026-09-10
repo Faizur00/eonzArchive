@@ -1,0 +1,166 @@
+/* ==========================================================================
+   EONZARCHIVE - SWISS MINIMALIST & OLD ARCHIVE DESIGN TOKENS
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Crimson+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Font Families - Classical Archival & Swiss Typography */
+  --font-serif: 'EB Garamond', 'Cormorant Garamond', Georgia, serif;
+  --font-heading: 'EB Garamond', 'Cormorant Garamond', Georgia, serif;
+  --font-body: 'Crimson Pro', Georgia, serif;
+  --font-ui: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Strict Swiss Minimalist Rule: NO ROUNDED CORNERS */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-full: 0px;
+
+  /* Spacing Scale */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+  --space-3xl: 48px;
+
+  /* Transitions */
+  --transition-fast: 120ms ease;
+  --transition-normal: 200ms ease;
+}
+
+/* ==========================================================================
+   DARK THEME: ASH CHARCOAL & SUBTLE DARK GREY (NOT PURE OLED)
+   ========================================================================== */
+[data-theme="dark"] {
+  --bg-app: #1b1e21;
+  --bg-surface: #202327;
+  --bg-surface-elevated: #262a2e;
+  --bg-surface-subtle: #171a1d;
+  --bg-hover: #262a2e;
+  --bg-input: #1b1e21;
+
+  --border-subtle: #2c3136;
+  --border-medium: #3a4046;
+  --border-strong: #4e565e;
+  --border-focus: #8b99a6;
+
+  --text-primary: #e3e6e9;
+  --text-secondary: #9aa4ae;
+  --text-muted: #6b7681;
+  --text-inverse: #1b1e21;
+
+  --brand-primary: #7d8d9b;
+  --brand-primary-hover: #96a5b1;
+  --brand-accent: #6b7d8b;
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: 0 4px 20px rgba(0, 0, 0, 0.5);
+
+  /* Muted Archival Format Badges */
+  --badge-epub-bg: #1c2420;
+  --badge-epub-text: #8bb89e;
+  --badge-epub-border: #2d3d34;
+
+  --badge-pdf-bg: #271f21;
+  --badge-pdf-text: #b88b8e;
+  --badge-pdf-border: #422f33;
+
+  --badge-mobi-bg: #26231d;
+  --badge-mobi-text: #b8a68b;
+  --badge-mobi-border: #3d362b;
+
+  --badge-txt-bg: #1d2228;
+  --badge-txt-text: #8fa0b5;
+  --badge-txt-border: #2c3642;
+
+  --badge-md-bg: #222026;
+  --badge-md-text: #aa97b8;
+  --badge-md-border: #383242;
+
+  /* Archival Cover Backgrounds (Muted Charcoal & Slate, strictly non-sepia) */
+  --spine-1: #1a1e22;
+  --spine-2: #1e2329;
+  --spine-3: #181d24;
+  --spine-4: #20242a;
+  --spine-5: #16191d;
+
+  /* Reader Surface (matches app theme) */
+  --reader-surface: #1b1e21;
+  --reader-frame-bg: #1b1e21;
+  --reader-text: #e3e6e9;
+  --reader-text-muted: #8d97a2;
+  --reader-border: #2c3136;
+  --reader-toolbar-bg: #1b1e21;
+}
+
+/* ==========================================================================
+   LIGHT THEME: WARM PARCHMENT PAPER
+   ========================================================================== */
+[data-theme="light"] {
+  --bg-app: #f4f0e6;
+  --bg-surface: #fbf8f0;
+  --bg-surface-elevated: #f6f2e8;
+  --bg-surface-subtle: #ece7da;
+  --bg-hover: #ede8dc;
+  --bg-input: #fbf8f0;
+
+  --border-subtle: #ded8c8;
+  --border-medium: #cdc6b4;
+  --border-strong: #a9a18d;
+  --border-focus: #6b6253;
+
+  --text-primary: #2b2a26;
+  --text-secondary: #5b5a52;
+  --text-muted: #8c897d;
+  --text-inverse: #fbf8f0;
+
+  --brand-primary: #3d464f;
+  --brand-primary-hover: #262d34;
+  --brand-accent: #525f6c;
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08);
+
+  /* Muted Archival Format Badges */
+  --badge-epub-bg: #eef4f0;
+  --badge-epub-text: #3e6e52;
+  --badge-epub-border: #c2d8cb;
+
+  --badge-pdf-bg: #f7eff0;
+  --badge-pdf-text: #784347;
+  --badge-pdf-border: #dec0c3;
+
+  --badge-mobi-bg: #f6f3ed;
+  --badge-mobi-text: #735e38;
+  --badge-mobi-border: #dcd2bf;
+
+  --badge-txt-bg: #eef2f7;
+  --badge-txt-text: #415a77;
+  --badge-txt-border: #c3d2e3;
+
+  --badge-md-bg: #f3eff6;
+  --badge-md-text: #5e4871;
+  --badge-md-border: #d5c8de;
+
+  /* Archival Cover Backgrounds */
+  --spine-1: #e9e9e4;
+  --spine-2: #e4e6e2;
+  --spine-3: #dfe2e5;
+  --spine-4: #eceae5;
+  --spine-5: #eae7e3;
+
+  /* Reader Surface (matches app theme) */
+  --reader-surface: #f4f0e6;
+  --reader-frame-bg: #f4f0e6;
+  --reader-text: #2b2a26;
+  --reader-text-muted: #6b6a5f;
+  --reader-border: #ded8c8;
+  --reader-toolbar-bg: #f4f0e6;
+}

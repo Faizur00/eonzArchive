@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index.js" },
+    { "source": "/", "destination": "/api/index.js" },
+    { "source": "/index.html", "destination": "/api/index.js" },
+    { "source": "/library", "destination": "/api/index.js" },
+    { "source": "/folder/(.*)", "destination": "/api/index.js" },
+    { "source": "/read/(.*)", "destination": "/api/index.js" },
+    { "source": "/(.*)", "destination": "/api/index.js" }
+  ]
+}

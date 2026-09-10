@@ -8,13 +8,16 @@ const {
   getBookFormat, 
   isSupportedBook 
 } = require('../utils/gdriveHelper');
+const { Redis } = require('@upstash/redis');
 
 const SYNC_COOLDOWN_MS = parseInt(process.env.SYNC_COOLDOWN_MS, 10) || 5 * 60 * 1000; // 5 minutes = 300000 ms
 
 class DriveService {
   constructor(projectRoot) {
     this.projectRoot = projectRoot;
-    this.dataFile = path.resolve(projectRoot, 'data', 'library.json');
+    const dataDir = process.env.DATA_DIR || (process.env.VERCEL ? '/tmp/data' : path.resolve(projectRoot, 'data'));
+    this.dataFile = path.resolve(dataDir, 'library.json');
+    this.seedFile = path.resolve(projectRoot, 'data', 'library.json');
     this.driveClient = null;
     this.authClient = null;
     this.rootFolderId = null;
@@ -22,6 +25,18 @@ class DriveService {
     this.isSyncing = false;
     this.lastSyncTime = null;
     this.libraryData = this.loadLibraryFromDisk();
+    this.redisLoaded = false;
+
+    const redisUrl = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+    const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+    if (redisUrl && redisToken) {
+      this.redis = new Redis({
+        url: redisUrl,
+        token: redisToken
+      });
+    } else {
+      this.redis = null;
+    }
 
     this.init();
   }
@@ -33,10 +48,50 @@ class DriveService {
     }
   }
 
+  async ensureLibraryLoaded() {
+    if (this.redisLoaded) return;
+    this.redisLoaded = true;
+
+    if (this.redis) {
+      try {
+        const cached = await this.redis.get('library:data');
+        if (cached) {
+          const data = typeof cached === 'string' ? JSON.parse(cached) : cached;
+          if (data && Array.isArray(data.books) && data.books.length > 0) {
+            this.libraryData = data;
+            if (data.rootFolder) {
+              this.rootFolderInfo = data.rootFolder;
+            }
+            if (data.lastSyncTime) {
+              this.lastSyncTime = new Date(data.lastSyncTime);
+            }
+            console.log(`📦 Loaded ${data.books.length} books from Redis / Vercel KV`);
+          }
+        } else if (this.libraryData && this.libraryData.books && this.libraryData.books.length > 0) {
+          // Seed Redis with the bundled library on first boot
+          await this.redis.set('library:data', this.libraryData);
+          console.log(`📦 Seeded Redis with initial library data (${this.libraryData.books.length} books)`);
+        }
+      } catch (e) {
+        console.warn('Could not read library data from Redis:', e.message);
+      }
+    }
+  }
+
   loadLibraryFromDisk() {
     try {
+      // 1. Check runtime writable data file
       if (fs.existsSync(this.dataFile)) {
         const raw = fs.readFileSync(this.dataFile, 'utf8');
+        const data = JSON.parse(raw);
+        if (data && data.lastSyncTime) {
+          this.lastSyncTime = new Date(data.lastSyncTime);
+        }
+        return data;
+      }
+      // 2. Fall back to bundled seed file
+      if (this.seedFile && fs.existsSync(this.seedFile)) {
+        const raw = fs.readFileSync(this.seedFile, 'utf8');
         const data = JSON.parse(raw);
         if (data && data.lastSyncTime) {
           this.lastSyncTime = new Date(data.lastSyncTime);
@@ -61,7 +116,7 @@ class DriveService {
     };
   }
 
-  saveLibraryToDisk() {
+  async saveLibraryToDisk() {
     try {
       this.ensureDataDir();
       const payload = {
@@ -74,6 +129,15 @@ class DriveService {
       };
       fs.writeFileSync(this.dataFile, JSON.stringify(payload, null, 2), 'utf8');
       this.libraryData = payload;
+
+      if (this.redis) {
+        try {
+          await this.redis.set('library:data', payload);
+          console.log('📦 Persisted synced library index to Redis / Vercel KV');
+        } catch (redisErr) {
+          console.error('Failed to save library data to Redis:', redisErr.message);
+        }
+      }
     } catch (e) {
       console.error('Failed to save library data to disk:', e.message);
     }
@@ -344,7 +408,7 @@ class DriveService {
       };
 
       this.lastSyncTime = new Date();
-      this.saveLibraryToDisk();
+      await this.saveLibraryToDisk();
 
       const durationMs = Date.now() - startTime;
       console.log(`✅ Synced with Google Drive in ${durationMs}ms: ${discoveredBooks.length} books, ${discoveredFolders.length} folders.`);

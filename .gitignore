@@ -5,10 +5,11 @@ node_modules/
 !.package.json
 !package.json
 !tsconfig.json
+!vercel.json
 !kookit/**
 .cache/
 data/cache/
-data/library.json
+!data/library.json
 web/lib/pdfjs/cmaps/
 web/lib/pdfjs/standard_fonts/
 .DS_Store
