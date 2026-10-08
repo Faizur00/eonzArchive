@@ -281,6 +281,19 @@
 
     </div>
 
+    <!-- Mobile Bottom Navigation Bar -->
+    <nav class="reader-bottom-bar" id="readerBottomBar">
+      <button class="btn btn-ghost btn-sm btn-icon" onclick="Reader.prevPage()" title="Previous Page">
+        <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div class="reader-bottom-info">
+        <span id="readerPageIndicatorMobile" class="reader-page-indicator-mobile">SECTION 1</span>
+      </div>
+      <button class="btn btn-ghost btn-sm btn-icon" onclick="Reader.nextPage()" title="Next Page">
+        <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </nav>
+
     <!-- Table of Contents Side Drawer -->
     <div id="tocBackdrop" class="toc-backdrop"></div>
     <aside id="tocDrawer" class="toc-drawer">
@@ -351,6 +364,15 @@
         <div style="margin-top:6px;">
           <div class="settings-label">LETTER SPACING</div>
           <input type="range" id="letterSpacingSlider" class="range-slider" min="0" max="4" step="0.1" value="0">
+        </div>
+
+        <div style="margin-top:10px;">
+          <div class="settings-label">TEXT ALIGNMENT</div>
+          <select id="textAlignSelect" class="select-field" style="width:100%;">
+            <option value="left">LEFT</option>
+            <option value="justify">JUSTIFY</option>
+            <option value="book">BOOK DEFAULT</option>
+          </select>
         </div>
       </div>
     </div>

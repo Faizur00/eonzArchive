@@ -24,6 +24,7 @@ const State = {
   readerFontSize: parseFloat(localStorage.getItem('eonz.spacing.font') || '1'),
   readerWordSpacing: parseFloat(localStorage.getItem('eonz.spacing.word') || '0'),
   readerLetterSpacing: parseFloat(localStorage.getItem('eonz.spacing.letter') || '0'),
+  readerTextAlign: localStorage.getItem('eonz.reader.align') || 'left',
   pdfZoom: 1,
 
   // Runtime objects
@@ -47,10 +48,14 @@ const State = {
     localStorage.setItem('eonz.reader.width', preset);
     const frame = document.getElementById('readerFrame');
     if (!frame) return;
-    if (preset === 'compact') frame.style.width = '50vw';
-    else if (preset === 'standard') frame.style.width = '65vw';
-    else if (preset === 'wide') frame.style.width = '80vw';
-    else if (preset === 'full') frame.style.width = '96vw';
+    if (window.innerWidth <= 768) {
+      frame.style.width = '100vw';
+      return;
+    }
+    if (preset === 'compact') frame.style.width = 'min(50vw, 520px)';
+    else if (preset === 'standard') frame.style.width = 'min(65vw, 680px)';
+    else if (preset === 'wide') frame.style.width = 'min(80vw, 820px)';
+    else if (preset === 'full') frame.style.width = 'min(96vw, 1000px)';
   }
 };
 
