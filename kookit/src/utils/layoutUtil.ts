@@ -260,54 +260,36 @@ export const progressInfo = (
   if (vertical) {
     let section = Math.floor(element.clientHeight / 12);
     let gap = section % 2 === 0 ? section : section - 1;
+    const pageDim = doc.body.clientHeight + gap;
     return {
       totalPage:
         readerMode === "single"
-          ? Math.round(
-              parseFloat(
-                doc.body.scrollHeight / (doc.body.clientHeight + gap) + ""
-              )
-            )
-          : Math.round(
-              parseFloat(
-                doc.body.scrollHeight / (doc.body.clientHeight + gap) + ""
-              )
-            ) * 2,
+          ? Math.max(1, Math.round(parseFloat(doc.body.scrollHeight / pageDim + "")))
+          : Math.max(1, Math.round(parseFloat(doc.body.scrollHeight / pageDim + "")) * 2),
       currentPage:
         Math.round(
           parseFloat(
-            convertStyleNum(doc.body.scrollTop) /
-              (doc.body.clientHeight + gap) +
-              ""
+            convertStyleNum(doc.body.scrollTop) / pageDim + ""
           )
         ) + 1,
     };
   }
   let section = Math.floor(element.clientWidth / 12);
   let gap = section % 2 === 0 ? section : section - 1;
+  const pageDim = doc.body.clientWidth + gap;
   return {
     totalPage:
       readerMode === "scroll"
         ? Math.floor(element.scrollHeight / (element.clientHeight - 50))
         : readerMode === "single"
-          ? Math.round(
-              parseFloat(
-                doc.body.scrollWidth / (doc.body.clientWidth + gap) + ""
-              )
-            )
-          : Math.round(
-              parseFloat(
-                doc.body.scrollWidth / (doc.body.clientWidth + gap) + ""
-              )
-            ) * 2,
+          ? Math.max(1, Math.round(parseFloat(doc.body.scrollWidth / pageDim + "")))
+          : Math.max(1, Math.round(parseFloat(doc.body.scrollWidth / pageDim + "")) * 2),
     currentPage:
       readerMode === "scroll"
         ? Math.floor(element.scrollTop / (element.clientHeight - 50)) + 1
         : Math.round(
             parseFloat(
-              convertStyleNum(doc.body.scrollLeft) /
-                (doc.body.clientWidth + gap) +
-                ""
+              convertStyleNum(doc.body.scrollLeft) / pageDim + ""
             )
           ) + 1,
   };
@@ -729,7 +711,7 @@ export const handleLayout = (
 ) => {
   let style = doc.createElement("style");
   style.id = "default-style";
-  style.textContent = "body{margin: 0px}";
+  style.textContent = "html,body{margin:0px !important;padding:0px !important;height:100% !important;overflow:hidden !important;box-sizing:border-box !important;}";
   doc.head.appendChild(style);
   const vertical = isVerticalLayout();
   if (readerMode === "scroll") {

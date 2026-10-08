@@ -15,6 +15,12 @@ const Reader = {
     // Mode switcher
     const modeSelect = document.getElementById('readerModeSelect');
     if (modeSelect) {
+      // Spread (double page) needs two columns side by side — not usable on phones
+      if (window.innerWidth <= 768) {
+        const spreadOpt = modeSelect.querySelector('option[value="double"]');
+        if (spreadOpt) spreadOpt.disabled = true;
+        if (State.readerMode === 'double') State.readerMode = 'single';
+      }
       modeSelect.value = State.readerMode;
       modeSelect.addEventListener('change', async (e) => {
         State.readerMode = e.target.value;
@@ -112,6 +118,16 @@ const Reader = {
       });
     }
 
+    const textAlignSelect = document.getElementById('textAlignSelect');
+    if (textAlignSelect) {
+      textAlignSelect.value = State.readerTextAlign;
+      textAlignSelect.addEventListener('change', (e) => {
+        State.readerTextAlign = e.target.value;
+        localStorage.setItem('eonz.reader.align', State.readerTextAlign);
+        this.applyReadingStyles();
+      });
+    }
+
     // Fullscreen toggle
     const fullscreenBtn = document.getElementById('fullscreenToggleBtn');
     if (fullscreenBtn) {
@@ -123,6 +139,9 @@ const Reader = {
     const nextHotspot = document.getElementById('navHotspotNext');
     if (prevHotspot) prevHotspot.addEventListener('click', () => this.prevPage());
     if (nextHotspot) nextHotspot.addEventListener('click', () => this.nextPage());
+
+    // Mobile tap zones & swipe navigation
+    this.bindMobileTouchNav();
 
     // Window resize handler for automatic reflow
     let resizeTimer = null;
@@ -316,6 +335,14 @@ const Reader = {
         backgroundColor: bgMap[State.theme] || '#1b1e21'
       }, overrides);
 
+      // Force single-page on mobile — spread mode is unusable on small screens
+      if (window.innerWidth <= 768 && config.readerMode === 'double') {
+        config.readerMode = 'single';
+        State.readerMode = 'single';
+        const modeSelect = document.getElementById('readerModeSelect');
+        if (modeSelect) modeSelect.value = 'single';
+      }
+
       let rendition = null;
       if (window.Kookit.BookHelper && typeof window.Kookit.BookHelper.getRendition === 'function') {
         rendition = window.Kookit.BookHelper.getRendition(buffer, config, window.Kookit);
@@ -440,9 +467,14 @@ const Reader = {
       }
     }
 
+    // Mobile swipe & tap zones must reach every document inside the reader,
+    // including the nested PDF page iframes (touch events never cross frames).
+    this.attachMobileTouchDocs(rendition, epubDoc);
+
     if (!epubDoc || !epubIframe || epubDoc.__kookitEventsAttached) return;
 
     epubDoc.__kookitEventsAttached = true;
+
     epubDoc.addEventListener('click', async (e) => {
       try {
         if (this.isFootnoteOpen() && !e.target.closest('#footnotePopup')) {
@@ -483,6 +515,105 @@ const Reader = {
     });
   },
 
+  attachMobileTouchDocs(rendition, mainDoc) {
+    if (window.innerWidth > 768) return;
+    const ts = this._mobileTouchStart;
+    const te = this._mobileTouchEnd;
+    if (!ts || !te) return;
+
+    const attach = (doc) => {
+      if (!doc || doc.__mobileSwipeAttached) return;
+      doc.__mobileSwipeAttached = true;
+      doc.addEventListener('touchstart', ts, { passive: true });
+      doc.addEventListener('touchend', te, { passive: true });
+    };
+
+    attach(mainDoc);
+
+    // Nested frames: PDF page iframes (#pdf-iframe-N) and any other child frame
+    try {
+      if (mainDoc && typeof mainDoc.querySelectorAll === 'function') {
+        mainDoc.querySelectorAll('iframe').forEach((fr) => {
+          try { attach(fr.contentDocument); } catch (e) {}
+        });
+      }
+      if (rendition && typeof rendition.getAllDocuments === 'function') {
+        const docs = rendition.getAllDocuments();
+        if (Array.isArray(docs)) docs.forEach(attach);
+      }
+    } catch (e) {}
+  },
+
+  bindMobileTouchNav() {
+    const pageArea = document.getElementById('page-area');
+    if (!pageArea) return;
+
+    let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
+    const SWIPE_THRESHOLD = 40;   // px — minimum horizontal displacement for a swipe
+    const TIME_THRESHOLD  = 500;  // ms — maximum gesture duration
+    const TAP_THRESHOLD   = 10;   // px — max movement for a tap (not a swipe)
+
+    const onTouchStart = (e) => {
+      touchStartX    = e.touches[0].clientX;
+      touchStartY    = e.touches[0].clientY;
+      touchStartTime = Date.now();
+    };
+
+    const onTouchEnd = (e) => {
+      // Don't intercept while an annotation tool is active
+      if (window.Annotations && Annotations.activeTool !== 'none') return;
+      if (this.isFootnoteOpen()) return;
+
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      const dy = e.changedTouches[0].clientY - touchStartY;
+      const dt = Date.now() - touchStartTime;
+      const isPageMode = State.readerMode === 'single' || State.readerMode === 'double';
+
+      // Short tap (minimal movement). Allow slow taps up to 800 ms.
+      if (Math.abs(dx) < TAP_THRESHOLD && Math.abs(dy) < TAP_THRESHOLD) {
+        if (dt > 800) return;
+        // A stale selection must not block page turns. Clear it and continue.
+        try {
+          const srcDoc = e.target && e.target.ownerDocument;
+          const sel = srcDoc && srcDoc.getSelection ? srcDoc.getSelection() : null;
+          if (sel && !sel.isCollapsed) sel.removeAllRanges();
+        } catch (err) {}
+        const viewW = window.innerWidth;
+        const tapX  = e.changedTouches[0].clientX;
+        if (!isPageMode) {
+          // In scroll mode only the center tap toggles the bars.
+          if (tapX >= viewW * 0.25 && tapX <= viewW * 0.75) this.toggleReaderBars();
+          return;
+        }
+        if      (tapX < viewW * 0.25) this.prevPage();
+        else if (tapX > viewW * 0.75) this.nextPage();
+        else                          this.toggleReaderBars();
+        return;
+      }
+
+      // Horizontal swipe takes priority, but only in page mode.
+      if (!isPageMode) return;
+      if (dt > TIME_THRESHOLD) return;
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > SWIPE_THRESHOLD) {
+        if (dx < 0) this.nextPage();
+        else         this.prevPage();
+        return;
+      }
+    };
+
+    pageArea.addEventListener('touchstart', onTouchStart, { passive: true });
+    pageArea.addEventListener('touchend',   onTouchEnd,   { passive: true });
+
+    // Store refs so iframes can attach the same handlers (see attachIframeInterceptors)
+    this._mobileTouchStart = onTouchStart;
+    this._mobileTouchEnd   = onTouchEnd;
+  },
+
+  toggleReaderBars() {
+    const readerView = document.getElementById('readerView');
+    if (readerView) readerView.classList.toggle('bars-hidden');
+  },
+
   async rebuildRendition() {
     if (!State.currentBook) return;
     this.savePositionNow();
@@ -499,14 +630,21 @@ const Reader = {
     
     const chapIndicator = document.getElementById('readerChapterIndicator');
     if (chapIndicator && pos) {
-      const idx = pos.chapterDocIndex !== undefined ? pos.chapterDocIndex + 1 : 1;
+      const idx = pos.chapterDocIndex !== undefined ? parseInt(pos.chapterDocIndex, 10) + 1 : 1;
       chapIndicator.textContent = `SECTION ${idx}`;
+    }
+
+    // Sync mobile bottom bar indicator
+    const mobileIndicator = document.getElementById('readerPageIndicatorMobile');
+    if (mobileIndicator && pos) {
+      const idx = pos.chapterDocIndex !== undefined ? parseInt(pos.chapterDocIndex, 10) + 1 : 1;
+      mobileIndicator.textContent = `SECTION ${idx}`;
     }
 
     if (pos && pos.chapterDocIndex !== undefined) {
       document.querySelectorAll('.toc-item').forEach(el => {
         const cIndex = parseInt(el.getAttribute('data-chapter-index'), 10);
-        el.classList.toggle('active', cIndex === pos.chapterDocIndex);
+        el.classList.toggle('active', cIndex === parseInt(pos.chapterDocIndex, 10));
       });
       if (window.Annotations) {
         Annotations.onPageChanged(pos.chapterDocIndex);
@@ -577,6 +715,27 @@ const Reader = {
         border-bottom: 2.5px solid #ef4444 !important;
         background-color: transparent !important;
       }
+      ${State.readerTextAlign === 'left' ? `
+      body p, body li {
+        text-align: left !important;
+      }
+      body p.center, body div.center, body p[class*="center"], body div[class*="center"],
+      body p[align="center"], body div[align="center"],
+      body [style*="text-align: center"], body [style*="text-align:center"] {
+        text-align: center !important;
+      }
+      ` : ''}
+      ${State.readerTextAlign === 'justify' ? `
+      body p, body li {
+        text-align: justify !important;
+        hyphens: auto;
+      }
+      body p.center, body div.center, body p[class*="center"], body div[class*="center"],
+      body p[align="center"], body div[align="center"],
+      body [style*="text-align: center"], body [style*="text-align:center"] {
+        text-align: center !important;
+      }
+      ` : ''}
     `;
   },
 
@@ -719,7 +878,10 @@ const Reader = {
 
   isFootnoteOpen() {
     const popup = document.getElementById('footnotePopup');
-    return popup && popup.style.display !== 'none';
+    if (!popup) return false;
+    if (popup.style.display === 'none') return false;
+    if (!popup.style.display) return getComputedStyle(popup).display !== 'none';
+    return true;
   },
 
   savePositionNow() {

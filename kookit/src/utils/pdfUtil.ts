@@ -28,6 +28,10 @@ export const handlePDFLayout = (
   doc: Document
 ) => {
   if (readerMode === "scroll") return;
+  if (doc.documentElement) {
+    doc.documentElement.style.height = "100%";
+    doc.documentElement.style.overflow = "hidden";
+  }
   let scale = readerMode === "double" ? 2 : 1;
   let section = Math.floor(doc.body.clientWidth / 12);
   let gap = section % 2 === 0 ? section : section - 1;
@@ -54,7 +58,9 @@ export const createPDFContainer = async (
     iframeContainer.id = "pdf-container-" + index;
     iframeContainer.className = "pdf-container";
     if (readerMode === "single") {
-      iframeContainer.style.paddingTop = element.clientHeight + "px";
+      iframeContainer.style.height = "100%";
+      iframeContainer.style.minHeight = "100%";
+      iframeContainer.style.breakInside = "avoid";
     } else if (readerMode === "double") {
       // Set aspect ratio based on PDF page dimensions
       const aspectRatio = viewport?.width / viewport?.height || 0.75; // Default to 3:4 if viewport unknown
@@ -120,6 +126,11 @@ export const handleScrollPDFPosition = async (
   if (!targetNode) return;
 
   if (readerMode !== "scroll") {
+    if (typeof targetNode.scrollIntoView === "function") {
+      try {
+        targetNode.scrollIntoView({ behavior: "auto", block: "nearest", inline: "start" });
+      } catch (e) {}
+    }
     let left = targetNode
       ? convertStyleNum(targetNode.offsetLeft) -
         convertStyleNum(
@@ -127,7 +138,8 @@ export const handleScrollPDFPosition = async (
             parseFloat(getComputedStyle(targetNode).marginLeft)
         )
       : 0;
-    doc.body.scrollTo(left, 0);
+    if (doc.body) doc.body.scrollTo(left, 0);
+    if (doc.documentElement) doc.documentElement.scrollTo(left, 0);
   } else {
     targetNode.scrollIntoView();
   }
