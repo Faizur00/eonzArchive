@@ -16,7 +16,9 @@ const State = {
   viewMode: localStorage.getItem('eonz.viewMode') || 'grid', // 'grid' or 'list'
 
   // App Theme (single source of truth for the whole webapp, including the reader)
-  theme: localStorage.getItem('eonz.theme') || 'dark',
+  // An explicit choice in localStorage wins; otherwise follow the system.
+  theme: localStorage.getItem('eonz.theme')
+    || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
 
   // Reader Settings
   readerMode: localStorage.getItem('eonz.reader.mode') || 'single',
@@ -32,9 +34,9 @@ const State = {
   currentRendition: null,
   isBuildingRendition: false,
   
-  setTheme(theme) {
+  setTheme(theme, { persist = true } = {}) {
     this.theme = theme;
-    localStorage.setItem('eonz.theme', theme);
+    if (persist) localStorage.setItem('eonz.theme', theme);
     document.documentElement.setAttribute('data-theme', theme);
   },
 

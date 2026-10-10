@@ -186,7 +186,7 @@ const Library = {
     if (!container) return;
 
     if (State.books.length === 0) {
-      container.innerHTML = '';
+      container.innerHTML = this.renderEmptyState();
       return;
     }
 
@@ -195,6 +195,54 @@ const Library = {
     } else {
       this.renderGridView(container);
     }
+  },
+
+  /**
+   * A folder with no documents and a filter that matched nothing are different
+   * situations and need different next steps. Rendering them identically leaves
+   * someone staring at a blank grid with no idea which one happened.
+   */
+  renderEmptyState() {
+    const filtering = State.formatFilter !== 'ALL' || State.cachedOnly;
+
+    if (filtering) {
+      let reason;
+      if (State.formatFilter !== 'ALL' && State.cachedOnly) {
+        reason = `Nothing here is both ${State.formatFilter} and cached locally.`;
+      } else if (State.formatFilter !== 'ALL') {
+        reason = `Nothing in this folder is in ${State.formatFilter} format.`;
+      } else {
+        reason = 'Nothing in this folder is cached locally.';
+      }
+      return `
+        <div class="empty-state">
+          <h3>NO DOCUMENTS MATCH</h3>
+          <p>${escapeHtml(reason)}</p>
+          <button class="btn btn-secondary btn-sm" style="margin-top: 12px;" onclick="Library.clearFilters()">
+            SHOW ALL DOCUMENTS
+          </button>
+        </div>`;
+    }
+
+    return `
+      <div class="empty-state">
+        <h3>THIS FOLDER IS EMPTY</h3>
+        <p>Add documents to this folder in Google Drive, then sync to index them.</p>
+        <button class="btn btn-secondary btn-sm" style="margin-top: 12px;" onclick="Library.triggerSync()">
+          SYNC NOW
+        </button>
+      </div>`;
+  },
+
+  clearFilters() {
+    State.formatFilter = 'ALL';
+    State.cachedOnly = false;
+    document.querySelectorAll('.pill-btn').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-format') === 'ALL');
+    });
+    const cachedToggle = document.getElementById('cachedOnlyToggle');
+    if (cachedToggle) cachedToggle.classList.remove('active');
+    this.loadFolder(State.currentFolderId);
   },
 
   renderGridView(container) {
@@ -208,9 +256,6 @@ const Library = {
               <div class="book-cover">
                 <div class="cover-header">
                   <span class="badge badge-${fmt}">${b.format}</span>
-                  <span class="status-pill">
-                    <span class="status-dot"></span> STREAM
-                  </span>
                 </div>
                 <div class="cover-title-area">
                   <div class="cover-book-title" title="${cleanTitle}">${cleanTitle}</div>
@@ -219,7 +264,7 @@ const Library = {
               <div class="book-card-body">
                 <div class="book-meta-row">
                   <span>SIZE: ${b.sizeFormatted || '0 B'}</span>
-                  <span>GOOGLE DRIVE</span>
+                  <span>${formatModified(b.modifiedTime)}</span>
                 </div>
                 <div class="book-actions-row">
                   <button class="btn btn-primary btn-sm" style="flex-grow: 1;" onclick="Router.navigate('/read/${b.id}')">
@@ -248,7 +293,7 @@ const Library = {
               <th>DOCUMENT TITLE</th>
               <th>FORMAT</th>
               <th>SIZE</th>
-              <th>STATUS</th>
+              <th>MODIFIED</th>
               <th style="text-align: right;">ACTION</th>
             </tr>
           </thead>
@@ -265,9 +310,7 @@ const Library = {
                   <td><span class="badge badge-${fmt}">${b.format}</span></td>
                   <td style="font-family: var(--font-mono);">${b.sizeFormatted || '0 B'}</td>
                   <td>
-                    <span class="status-pill">
-                      <span class="status-dot"></span> STREAM
-                    </span>
+                    <span style="font-family: var(--font-mono);">${formatModified(b.modifiedTime)}</span>
                   </td>
                   <td style="text-align: right;">
                     <button class="btn btn-primary btn-sm" onclick="Router.navigate('/read/${b.id}')">
@@ -327,6 +370,18 @@ function escapeHtml(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+/**
+ * Modified date for the card metadata row. This replaces a constant "GOOGLE
+ * DRIVE" label that printed the same fact on every card — the date varies per
+ * document, and DATE (RECENT) is already a sort option.
+ */
+function formatModified(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' });
 }
 
 function escapeQuotes(str) {

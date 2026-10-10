@@ -225,13 +225,33 @@ const Reader = {
     this.applyReadingStyles();
   },
 
-  showLoading(title, detail = '') {
+  showLoading(title, detail = '', opts = {}) {
     const overlay = document.getElementById('loadingOverlay');
     const titleEl = document.getElementById('loadingTitle');
     const detailEl = document.getElementById('loadingDetail');
-    if (overlay) overlay.style.display = 'flex';
-    if (titleEl) titleEl.textContent = title;
+    if (!overlay) return;
+
+    // Errors stay put. Auto-hiding an error leaves a working toolbar over an
+    // empty frame with no explanation, which is the failure we are fixing.
+    overlay.classList.toggle('is-error', !!opts.variant);
+    if (overlay.style.display !== 'flex') overlay.style.display = 'flex';
+
+    if (titleEl) {
+      titleEl.textContent = title;
+      if (opts.variant) titleEl.classList.add('is-error');
+      else titleEl.classList.remove('is-error');
+    }
     if (detailEl) detailEl.textContent = detail;
+
+    const existing = overlay.querySelector('.loading-action');
+    if (existing) existing.remove();
+    if (opts.action) {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-secondary btn-sm loading-action';
+      btn.textContent = opts.action.label;
+      btn.addEventListener('click', opts.action.onClick);
+      overlay.appendChild(btn);
+    }
   },
 
   hideLoading() {
@@ -240,6 +260,10 @@ const Reader = {
   },
 
   async openBook(fileId, bookName, format = 'EPUB', updateUrl = true) {
+    // Retained so the error state's Try Again can retry: on failure
+    // State.currentBook is never populated, so there is nothing else to retry from.
+    this._pendingOpen = { fileId, bookName, format };
+
     if (updateUrl && window.Router) {
       Router.navigate(`/read/${fileId}`);
     }
@@ -299,8 +323,19 @@ const Reader = {
       showToast('Document Ready', `Opened "${bookName}"`, 'success');
     } catch (err) {
       console.error('Error reading book:', err);
-      this.showLoading('Failed to Open Document', err.message);
-      setTimeout(() => this.hideLoading(), 3500);
+      this.showLoading('Failed to Open Document', err.message, {
+        variant: 'error',
+        action: {
+          label: 'TRY AGAIN',
+          onClick: () => {
+            if (this._pendingOpen) {
+              const p = this._pendingOpen;
+              this.openBook(p.fileId, p.bookName, p.format, false);
+            }
+          }
+        }
+      });
+      showToast('Document Failed', `${bookName} could not be opened.`, 'danger');
     }
   },
 
@@ -666,12 +701,20 @@ const Reader = {
       doc.head.appendChild(style);
     }
 
-    let bg = '#1b1e21';
-    let text = '#e3e6e9';
-    if (State.theme === 'light') {
-      bg = '#f4f0e6';
-      text = '#2b2a26';
-    }
+    // Resolved from the live tokens, not re-declared: the theme now follows the
+    // system, so a duplicated copy of this mapping would drift out of sync.
+    const cs = getComputedStyle(document.documentElement);
+    const token = (n, f) => { const v = cs.getPropertyValue(n); return v && v.trim() ? v.trim() : f; };
+    const bg = token('--reader-surface', '#1b1e21');
+    const text = token('--reader-text', '#e3e6e9');
+    const hl = {
+      'color-0': token('--hl-yellow', '#fef08a'),
+      'color-1': token('--hl-green', '#bbf7d0'),
+      'color-2': token('--hl-teal', '#99f6e4'),
+      'color-3': token('--hl-blue', '#bae6fd'),
+      'line-0': token('--hl-erase', '#ef4444')
+    };
+    const hlInk = token('--hl-ink', '#18181b');
 
     style.textContent = `
       html, body {
@@ -696,23 +739,23 @@ const Reader = {
         box-decoration-break: clone !important;
       }
       .kookit-note.color-0, .kookit-note[data-color="color-0"] {
-        background-color: #fef08a !important;
-        color: #18181b !important;
+        background-color: ${hl['color-0']} !important;
+        color: ${hlInk} !important;
       }
       .kookit-note.color-1, .kookit-note[data-color="color-1"] {
-        background-color: #bbf7d0 !important;
-        color: #18181b !important;
+        background-color: ${hl['color-1']} !important;
+        color: ${hlInk} !important;
       }
       .kookit-note.color-2, .kookit-note[data-color="color-2"] {
-        background-color: #99f6e4 !important;
-        color: #18181b !important;
+        background-color: ${hl['color-2']} !important;
+        color: ${hlInk} !important;
       }
       .kookit-note.color-3, .kookit-note[data-color="color-3"] {
-        background-color: #bae6fd !important;
-        color: #18181b !important;
+        background-color: ${hl['color-3']} !important;
+        color: ${hlInk} !important;
       }
       .kookit-note.line-0, .kookit-note[data-color="line-0"] {
-        border-bottom: 2.5px solid #ef4444 !important;
+        border-bottom: 2.5px solid ${hl['line-0']} !important;
         background-color: transparent !important;
       }
       ${State.readerTextAlign === 'left' ? `
@@ -742,7 +785,7 @@ const Reader = {
   async populateTOC(rendition) {
     const listEl = document.getElementById('tocList');
     if (!listEl) return;
-    listEl.innerHTML = '<li style="padding: 14px 18px; color: var(--text-muted); font-size: 13px;">INDEXING CHAPTERS...</li>';
+    listEl.innerHTML = '<li style="padding: 14px 18px; color: var(--text-muted); font-size:0.8125rem;">INDEXING CHAPTERS...</li>';
 
     try {
       let chapters = [];
@@ -755,7 +798,7 @@ const Reader = {
       this.chaptersList = chapters || [];
       this.renderTOCList(this.chaptersList);
     } catch (err) {
-      listEl.innerHTML = '<li style="padding: 14px 18px; color: var(--text-muted); font-size: 13px;">NO INDEX AVAILABLE.</li>';
+      listEl.innerHTML = '<li style="padding: 14px 18px; color: var(--text-muted); font-size:0.8125rem;">NO INDEX AVAILABLE.</li>';
     }
   },
 
@@ -764,7 +807,7 @@ const Reader = {
     if (!listEl) return;
 
     if (!chapters || chapters.length === 0) {
-      listEl.innerHTML = '<li style="padding: 14px 18px; color: var(--text-muted); font-size: 13px;">NO CHAPTERS FOUND.</li>';
+      listEl.innerHTML = '<li style="padding: 14px 18px; color: var(--text-muted); font-size:0.8125rem;">NO CHAPTERS FOUND.</li>';
       return;
     }
 

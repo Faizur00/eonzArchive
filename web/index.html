@@ -1,12 +1,24 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EONZ ARCHIVE - DIGITAL LIBRARY</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>EONZ ARCHIVE</title>
   <meta name="description" content="Personal archival library repository and reader.">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1b1e21">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f0e6">
 
-  <link rel="icon" type="image/svg+xml" href="/icon3.svg">
+  <!-- Resolve appearance before first paint: explicit override, else system.
+       Without this the page paints with the previous theme for one frame. -->
+  <script>
+    (function () {
+      var stored = localStorage.getItem('eonz.theme');
+      var theme = stored || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+
+  <link rel="icon" type="image/svg+xml" href="/icon3.svg·">
   <link rel="apple-touch-icon" href="/icon3.svg">
 
   <!-- Design System Stylesheets -->
@@ -143,8 +155,8 @@
 
     <!-- Minimal Breadcrumbs Path -->
     <nav class="breadcrumbs-bar" aria-label="Directory Breadcrumbs">
-      <button id="breadcrumbBackBtn" class="breadcrumb-back" style="display: none;" onclick="Library.goBack()">
-        <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg> BACK
+      <button id="breadcrumbBackBtn" class="breadcrumb-back" style="display: none;" onclick="Library.goBack()" title="Back" aria-label="Back">
+        <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
       <div id="breadcrumbsTrail" class="breadcrumb-trail">
         <span class="breadcrumb-item active">ROOT ARCHIVE</span>
@@ -170,9 +182,8 @@
     <!-- Top Reader Bar -->
     <header class="reader-top-bar">
       <div class="reader-bar-left">
-        <button class="btn btn-secondary btn-sm" onclick="Reader.closeReader()" title="Close Reader (Esc)">
+        <button class="btn btn-secondary btn-sm btn-icon" onclick="Reader.closeReader()" title="Back to library" aria-label="Back to library">
           <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-          <span>INDEX</span>
         </button>
         <div class="reader-book-info">
           <span id="readerFormatBadge" class="badge badge-epub">EPUB</span>
@@ -185,15 +196,6 @@
           <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
           <span id="readerChapterIndicator">SECTIONS</span>
         </button>
-
-        <div class="reader-nav-btns">
-          <button class="btn btn-ghost btn-sm btn-icon" onclick="Reader.prevPage()" title="Previous (←)">
-            <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
-          <button class="btn btn-ghost btn-sm btn-icon" onclick="Reader.nextPage()" title="Next (→)">
-            <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-        </div>
       </div>
 
       <div class="reader-bar-right">
@@ -439,6 +441,10 @@
       </div>
     </div>
   </div>
+
+  <!-- Transient status. aria-live announces it; the label text carries the
+       meaning so colour is never the only signal. -->
+  <div id="toastStack" class="toast-stack" role="status" aria-live="polite" aria-atomic="false"></div>
 
   <!-- Application Logic Scripts -->
   <script src="/js/api.js"></script>

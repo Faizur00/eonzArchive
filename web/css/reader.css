@@ -12,6 +12,11 @@
   overflow: hidden;
   user-select: none;
   transition: background-color var(--transition-normal);
+  /* viewport-fit=cover lets content reach the notch; these insets keep the
+     chrome and the reading surface clear of it and of the home indicator. */
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 /* Minimalist Top Reader Bar */
@@ -42,7 +47,7 @@
 
 .reader-book-title {
   font-family: var(--font-serif);
-  font-size: 15px;
+  font-size:0.9375rem;
   font-weight: 600;
   color: var(--reader-text);
   white-space: nowrap;
@@ -57,12 +62,6 @@
   justify-content: center;
   gap: 8px;
   flex: 1;
-}
-
-.reader-nav-btns {
-  display: flex;
-  align-items: center;
-  gap: 2px;
 }
 
 .reader-bar-right {
@@ -133,10 +132,11 @@
   border: 1px solid var(--reader-border);
   color: var(--reader-text-muted);
   cursor: pointer;
-  opacity: 0.4;
+  opacity: 0.75;
   transition: opacity var(--transition-fast), background-color var(--transition-fast);
 }
-.nav-hotspot:hover {
+.nav-hotspot:hover,
+.nav-hotspot:focus-visible {
   opacity: 1;
   color: var(--reader-text);
 }
@@ -162,6 +162,10 @@
   flex-direction: column;
   transform: translateX(-100%);
   transition: transform var(--transition-normal);
+  /* Drawers are fixed-position children, so they do not inherit #readerView's
+     inset padding. They need their own. */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 .toc-drawer.open {
   transform: translateX(0);
@@ -190,7 +194,7 @@
 }
 .toc-header h3 {
   font-family: var(--font-heading);
-  font-size: 16px;
+  font-size:1rem;
   font-weight: 600;
   letter-spacing: 0.5px;
 }
@@ -206,7 +210,7 @@
   border: 1px solid var(--border-medium);
   color: var(--text-primary);
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size:0.75rem;
   outline: none;
 }
 
@@ -220,7 +224,7 @@
 .toc-item {
   padding: 10px 18px;
   font-family: var(--font-serif);
-  font-size: 14px;
+  font-size:0.875rem;
   color: var(--text-secondary);
   cursor: pointer;
   border-left: 2px solid transparent;
@@ -265,7 +269,7 @@
 }
 .settings-label {
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size:0.6875rem;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -279,7 +283,7 @@
   background: var(--bg-surface-elevated);
   color: var(--text-primary);
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size:0.75rem;
   font-weight: 600;
   letter-spacing: 0.4px;
   text-transform: uppercase;
@@ -298,9 +302,10 @@
   gap: 4px;
 }
 .width-btn {
-  padding: 4px;
+  padding: 8px 4px;
+  min-height: 28px;
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size:0.6875rem;
   font-weight: 600;
   text-transform: uppercase;
   background: var(--bg-surface);
@@ -333,7 +338,7 @@
   background: var(--bg-surface-subtle);
   border-bottom: 1px solid var(--border-subtle);
   font-family: var(--font-ui);
-  font-size: 11.5px;
+  font-size:0.71875rem;
   font-weight: 600;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -341,7 +346,7 @@
 #footnoteContent {
   padding: 12px 14px;
   font-family: var(--font-body);
-  font-size: 14px;
+  font-size:0.875rem;
   line-height: 1.6;
   color: var(--text-primary);
   max-height: 220px;
@@ -372,14 +377,22 @@
 }
 #loadingTitle {
   font-family: var(--font-heading);
-  font-size: 16px;
+  font-size:1rem;
   font-weight: 600;
   color: var(--text-primary);
 }
+#loadingTitle.is-error {
+  color: var(--danger-text);
+}
+.loading-action {
+  margin-top: 4px;
+}
 #loadingDetail {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size:0.6875rem;
   color: var(--text-muted);
+  max-width: 40ch;
+  overflow-wrap: break-word;
 }
 
 /* ==========================================================================
@@ -396,9 +409,10 @@
   padding: 2px 4px;
 }
 .annot-tool-btn {
-  padding: 4px 6px;
+  padding: 8px 8px;
+  min-height: 28px;
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size:0.6875rem;
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -407,7 +421,7 @@
   border: none;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 .annot-tool-btn:hover {
   color: var(--text-primary);
@@ -420,7 +434,7 @@
 }
 .annot-count-badge {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size:0.625rem;
   background: var(--text-primary);
   color: var(--bg-surface);
   padding: 1px 5px;
@@ -455,27 +469,44 @@
   align-items: center;
   gap: 4px;
 }
+/* Color swatch: 28px hit target, 18px visual. Matches the dock colour wells so
+   the two highlight pickers read as the same control. */
 .color-swatch-btn {
-  width: 20px;
-  height: 20px;
-  border-radius: 2px;
-  border: 1px solid rgba(0, 0, 0, 0.2);
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: none;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
+  display: grid;
+  place-items: center;
+  font-size:0.625rem;
   font-weight: bold;
   transition: transform var(--transition-fast);
 }
-.color-swatch-btn:hover {
-  transform: scale(1.15);
+.color-swatch-btn::before {
+  content: '';
+  width: 18px;
+  height: 18px;
+  border-radius: 2px;
+  border: 1px solid var(--swatch-border);
 }
-.color-swatch-btn.color-0 { background: #fef08a; }
-.color-swatch-btn.color-1 { background: #bbf7d0; }
-.color-swatch-btn.color-2 { background: #99f6e4; }
-.color-swatch-btn.color-3 { background: #bae6fd; }
-.color-swatch-btn.line-0 { background: var(--bg-surface); color: #ef4444; }
+.color-swatch-btn:hover {
+  transform: scale(1.1);
+}
+/* Fill lands on the ::before visual swatch so the 28px target stays transparent */
+.color-swatch-btn.color-0::before { background: var(--hl-yellow); }
+.color-swatch-btn.color-1::before { background: var(--hl-green); }
+.color-swatch-btn.color-2::before { background: var(--hl-teal); }
+.color-swatch-btn.color-3::before { background: var(--hl-blue); }
+.color-swatch-btn.line-0::before { background: var(--bg-surface); border-color: var(--hl-erase); }
+.color-swatch-btn.line-0::after {
+  content: '';
+  grid-area: 1 / 1;
+  width: 12px;
+  border-top: 2.5px solid var(--hl-erase);
+  align-self: center;
+}
 
 .toolbar-divider {
   width: 1px;
@@ -488,12 +519,13 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 6px;
+  padding: 8px;
+  min-height: 28px;
   background: transparent;
   border: none;
   color: var(--text-primary);
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size:0.6875rem;
   font-weight: 600;
   cursor: pointer;
   transition: background var(--transition-fast);
@@ -527,7 +559,7 @@
 }
 .dock-handle {
   font-family: var(--font-heading);
-  font-size: 11px;
+  font-size:0.6875rem;
   font-weight: 700;
   color: var(--text-muted);
   letter-spacing: 0.5px;
@@ -539,7 +571,9 @@
   gap: 3px;
 }
 .dock-btn {
-  padding: 4px 6px;
+  padding: 8px;
+  min-height: 28px;
+  min-width: 28px;
   background: transparent;
   border: 1px solid transparent;
   color: var(--text-secondary);
@@ -547,6 +581,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 .dock-btn:hover {
   background: var(--bg-hover);
@@ -569,12 +604,32 @@
   gap: 5px;
 }
 .dock-color-btn {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.3);
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
   cursor: pointer;
+  display: grid;
+  place-items: center;
   transition: transform var(--transition-fast);
+}
+.dock-color-btn::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--swatch-border);
+  background: var(--draw-amber);
+}
+.dock-color-btn[data-draw="amber"]::before { background: var(--draw-amber); }
+.dock-color-btn[data-draw="emerald"]::before { background: var(--draw-emerald); }
+.dock-color-btn[data-draw="blue"]::before { background: var(--draw-blue); }
+.dock-color-btn[data-draw="red"]::before { background: var(--draw-red); }
+.dock-color-btn[data-draw="white"]::before {
+  background: var(--draw-white);
+  border-color: var(--draw-white-border);
 }
 .dock-color-btn:hover {
   transform: scale(1.2);
@@ -584,8 +639,8 @@
   outline-offset: 1px;
 }
 .dock-width-btn {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -627,6 +682,8 @@
   flex-direction: column;
   transform: translateX(100%);
   transition: transform var(--transition-normal);
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 .annotations-drawer.open {
   transform: translateX(0);
@@ -654,7 +711,7 @@
   flex: 1;
   padding: 8px 4px;
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size:0.6875rem;
   font-weight: 600;
   text-align: center;
   background: transparent;
@@ -697,19 +754,19 @@
 }
 .annot-item-date {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size:0.625rem;
   color: var(--text-muted);
 }
 .annot-item-body {
   font-family: var(--font-serif);
-  font-size: 13.5px;
+  font-size:0.84375rem;
   color: var(--text-primary);
   line-height: 1.45;
   word-break: break-word;
 }
 .drawer-note-pill {
   font-family: var(--font-body);
-  font-size: 12px;
+  font-size:0.75rem;
   color: var(--text-secondary);
   margin-top: 4px;
   padding: 4px 8px;
@@ -759,17 +816,14 @@
   }
   .reader-book-title {
     max-width: 130px;
-    font-size: 13px;
+    font-size:0.8125rem;
   }
   .reader-bar-center {
     flex: 0 0 auto;
   }
-  .reader-bar-center .reader-nav-btns {
-    display: none !important;
-  }
   #tocToggleBtn {
     padding: 4px 8px;
-    font-size: 11px;
+    font-size:0.6875rem;
   }
   .reader-bar-right {
     gap: 4px;
@@ -782,18 +836,33 @@
     display: none;
   }
   .reader-annotation-tools .annot-tool-btn {
-    padding: 4px 6px;
+    padding: 8px;
+    min-height: 28px;
+    min-width: 28px;
+    justify-content: center;
+  }
+  /* One-handed reach: the bottom bar has the room, so the real target grows.
+     The glyph grows with it, otherwise a 13px chevron floats in a 44px button. */
+  .reader-bottom-bar .btn-icon {
+    width: 44px;
+    height: 44px;
+  }
+  .reader-bottom-bar .btn-icon .icon {
+    width: 20px;
+    height: 20px;
   }
   #readerModeSelect {
     padding: 4px 18px 4px 4px;
-    font-size: 10.5px;
+    font-size:0.65625rem;
   }
   .reader-bottom-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 16px;
-    height: 44px;
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-bottom: env(safe-area-inset-bottom);
+    min-height: 44px;
     background: var(--reader-toolbar-bg);
     border-top: 1px solid var(--reader-border);
     z-index: 600;
@@ -802,7 +871,7 @@
   }
   .reader-bottom-info {
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size:0.75rem;
     color: var(--reader-text-muted);
     letter-spacing: 0.5px;
     user-select: none;
@@ -826,12 +895,12 @@
   .settings-popover {
     position: fixed;
     top: auto;
-    bottom: 52px;
+    bottom: calc(env(safe-area-inset-bottom) + 52px);
     left: 12px;
     right: 12px;
     width: auto;
     max-width: none;
-    border: 1px solid var(--border-medium);
+    border: 1px solid var(--border-control);
     box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
     z-index: 750;
   }

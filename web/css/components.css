@@ -6,7 +6,6 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  border-radius: 0 !important; /* Enforce strict Swiss geometric sharpness */
 }
 
 html, body {
@@ -44,11 +43,11 @@ html, body {
   gap: 8px;
   padding: 8px 16px;
   font-family: var(--font-ui);
-  font-size: 12.5px;
+  font-size:0.78125rem;
   font-weight: 600;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  border: 1px solid var(--border-medium);
+  border: 1px solid var(--border-control);
   cursor: pointer;
   outline: none;
   text-decoration: none;
@@ -59,8 +58,15 @@ html, body {
   transition: all var(--transition-fast);
 }
 
+/* Single focus ring for every interactive control. Components that ship with
+   `outline: none` (select-field, text inputs) opt back in below. */
+:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+}
+
 .btn:focus-visible {
-  outline: 1px solid var(--text-primary);
+  outline: 2px solid var(--text-primary);
   outline-offset: 2px;
 }
 
@@ -101,14 +107,14 @@ html, body {
   border-color: var(--border-medium);
 }
 .btn-danger:hover:not(:disabled) {
-  background: #381f21;
-  color: #e59d9f;
-  border-color: #5e3337;
+  background: var(--danger-surface);
+  color: var(--danger-text);
+  border-color: var(--danger-border);
 }
 
 .btn-sm {
   padding: 5px 10px;
-  font-size: 11px;
+  font-size:0.6875rem;
   letter-spacing: 0.4px;
 }
 
@@ -133,7 +139,7 @@ html, body {
   align-items: center;
   padding: 2px 6px;
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size:0.65625rem;
   font-weight: 600;
   letter-spacing: 0.8px;
   text-transform: uppercase;
@@ -173,7 +179,7 @@ html, body {
   gap: 6px;
   padding: 2px 8px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size:0.6875rem;
   font-weight: 500;
   letter-spacing: 0.3px;
   border: 1px solid var(--border-subtle);
@@ -183,50 +189,68 @@ html, body {
 .status-dot {
   width: 5px;
   height: 5px;
-  background: var(--text-muted);
+  background: var(--text-secondary);
 }
-.status-pill.cached .status-dot {
-  background: var(--badge-epub-text);
-}
+/* Green is reserved for EPUB. Borrowing --badge-epub-text here made the same
+   colour mean three things (EPUB, connected, streaming). The text label now
+   carries the status on its own. */
 
 /* Dropdowns & Selects */
 .select-field {
   padding: 6px 28px 6px 10px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-medium);
+  border: 1px solid var(--border-control);
   color: var(--text-primary);
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size:0.75rem;
   font-weight: 600;
   letter-spacing: 0.4px;
   text-transform: uppercase;
-  outline: none;
-  cursor: pointer;
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238c96a5' stroke-width='2' stroke-linecap='square' stroke-linejoin='miter'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 8px center;
   transition: border-color var(--transition-fast);
 }
-.select-field:focus {
+.select-field:focus-visible {
   border-color: var(--border-focus);
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
 }
 
-/* Range Slider */
+/* Range Slider
+   The track is visually thin (4px, on-thesis) but carries a 28px hit area so
+   the word/letter spacing controls are usable on touch. */
 .range-slider {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 4px;
-  background: var(--border-medium);
-  outline: none;
+  height: 28px;
+  background: transparent;
   cursor: pointer;
+  position: relative;
+}
+.range-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--border-control);
+}
+.range-slider::-moz-range-track {
+  height: 4px;
+  background: var(--border-control);
 }
 .range-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 12px;
-  height: 12px;
+  width: 20px;
+  height: 20px;
+  margin-top: -8px;
+  background: var(--text-primary);
+  cursor: pointer;
+}
+.range-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: none;
   background: var(--text-primary);
   cursor: pointer;
 }
@@ -243,6 +267,9 @@ html, body {
   opacity: 0;
   visibility: hidden;
   transition: all var(--transition-fast);
+  /* Keeps the card clear of the notch in landscape and the indicator in portrait */
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
 }
 .modal-backdrop.open {
   opacity: 1;
@@ -250,8 +277,8 @@ html, body {
 }
 .modal-card {
   background: var(--bg-surface);
-  border: 1px solid var(--border-strong);
-  width: 90%;
+  border: 1px solid var(--border-control);
+  width: 100%;
   max-width: 480px;
   max-height: 85vh;
   display: flex;
@@ -267,14 +294,14 @@ html, body {
 }
 .modal-title {
   font-family: var(--font-heading);
-  font-size: 18px;
+  font-size:1.125rem;
   font-weight: 600;
   letter-spacing: 0.5px;
 }
 .modal-body {
   padding: 18px;
   overflow-y: auto;
-  font-size: 13.5px;
+  font-size:0.84375rem;
   color: var(--text-secondary);
 }
 .modal-footer {
@@ -347,4 +374,111 @@ html, body {
 .icon-lg {
   width: 20px;
   height: 20px;
+}
+
+/* ==========================================================================
+   REDUCED MOTION
+   The spinner keeps rotating: it is a status indicator, and freezing it makes
+   it report that work has stopped. Everything decorative stops.
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+
+  .spinner {
+    animation: spin 1.4s linear infinite !important;
+  }
+
+  .btn-progress::before,
+  .floating-selection-toolbar {
+    animation: none !important;
+  }
+
+  .dock-color-btn:hover,
+  .dock-width-btn:hover,
+  .color-swatch-btn:hover {
+    transform: none !important;
+  }
+}
+
+/* ==========================================================================
+   TOASTS
+   3px left rule echoes the .drawer-note-pill motif. Only `danger` carries
+   colour; info and success are told apart by their label, per colour.md
+   "avoid relying solely on color to differentiate".
+   ========================================================================== */
+.toast-stack {
+  position: fixed;
+  z-index: 1100;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(360px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-control);
+  border-left: 3px solid var(--text-secondary);
+  color: var(--text-primary);
+  pointer-events: auto;
+  cursor: pointer;
+  animation: toast-in 0.15s ease-out;
+}
+
+.toast.toast-danger {
+  border-left-color: var(--danger-border);
+}
+
+.toast-label {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+
+.toast.toast-danger .toast-label {
+  color: var(--danger-text);
+}
+
+.toast-body {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  overflow-wrap: break-word;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .toast-stack {
+    left: 12px;
+    right: 12px;
+    bottom: calc(env(safe-area-inset-bottom) + 56px);
+    max-width: none;
+  }
 }
