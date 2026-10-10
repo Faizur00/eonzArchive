@@ -8,19 +8,14 @@
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1b1e21">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f0e6">
 
-  <!-- Resolve appearance before first paint: explicit override, else system.
-       Without this the page paints with the previous theme for one frame. -->
-  <script>
-    (function () {
-      var stored = localStorage.getItem('eonz.theme');
-      var theme = stored || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-      document.documentElement.setAttribute('data-theme', theme);
-    })();
-  </script>
-
-  <link rel="icon" type="image/svg+xml" href="/icon3.svg·">
-  <link rel="apple-touch-icon" href="/icon3.svg">
-
+  <!-- icon3.svg is the single source for every icon format. The .ico and .png
+       files next to it are raster exports of that same SVG. -->
+  <link rel="icon" type="image/svg+xml" href="/icon3.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png">
+  <link rel="mask-icon" href="/icon3.svg" color="#f4f0e6">
   <!-- Design System Stylesheets -->
   <link rel="stylesheet" href="/css/variables.css">
   <link rel="stylesheet" href="/css/components.css">
