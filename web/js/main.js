@@ -4,7 +4,10 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Initialize Themes
-  State.setTheme(State.theme);
+  // persist:false — writing the system-derived value here would record it as if
+  // the person had chosen it, permanently pinning the app to their current
+  // system setting. Only an explicit toggle click should persist.
+  State.setTheme(State.theme, { persist: false });
 
   // Setup Theme Toggle Button
   const themeToggleBtn = document.getElementById('themeToggleBtn');
@@ -20,6 +23,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     updateThemeToggleIcon();
   }
+
+  // Follow the system appearance until the person makes an explicit choice.
+  // A stored choice pins the theme and this stops applying.
+  const colorScheme = window.matchMedia('(prefers-color-scheme: dark)');
+  colorScheme.addEventListener('change', (e) => {
+    if (localStorage.getItem('eonz.theme')) return;
+    State.setTheme(e.matches ? 'dark' : 'light', { persist: false });
+    updateThemeToggleIcon();
+    if (State.currentBook) {
+      Reader.applyReadingStyles();
+      Reader.rebuildRendition();
+    }
+  });
 
   // Setup Storage & Cache Modal
   setupStorageModal();
@@ -99,13 +115,13 @@ async function refreshStorageModalData() {
     const stats = status.cacheStats || { totalBytesFormatted: '0 B', count: 0 };
     body.innerHTML = `
       <div style="display:flex; flex-direction:column; gap:16px;">
-        <div style="background:var(--bg-surface-subtle); padding:16px; border-radius:var(--radius-md); border:1px solid var(--border-subtle);">
-          <div style="font-size:12px; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Storage Architecture</div>
-          <div style="font-size:20px; font-weight:700; color:var(--text-primary); margin:4px 0 8px;">Direct Drive Streaming</div>
-          <div style="font-size:13px; color:var(--text-secondary);">Stateless proxy streaming directly from Google Drive. 0 MB server disk used.</div>
+        <div style="background:var(--bg-surface-subtle); padding:16px; border-radius:var(--radius); border:1px solid var(--border-subtle);">
+          <div style="font-size:0.75rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Storage Architecture</div>
+          <div style="font-size:1.25rem; font-weight:700; color:var(--text-primary); margin:4px 0 8px;">Direct Drive Streaming</div>
+          <div style="font-size:0.8125rem; color:var(--text-secondary);">Stateless proxy streaming directly from Google Drive. 0 MB server disk used.</div>
         </div>
 
-        <div style="display:flex; flex-direction:column; gap:8px; font-size:13px;">
+        <div style="display:flex; flex-direction:column; gap:8px; font-size:0.8125rem;">
           <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border-subtle);">
             <span style="color:var(--text-muted);">Root Archive Folder</span>
             <span style="font-weight:600; color:var(--text-primary);">${status.rootFolder?.name || 'Archive'} (${status.rootFolder?.id || 'N/A'})</span>
@@ -122,7 +138,8 @@ async function refreshStorageModalData() {
       </div>
     `;
   } catch (err) {
-    body.innerHTML = `<p style="color:var(--color-danger)">Failed to load storage details: ${err.message}</p>`;
+    body.innerHTML = `<p style="color:var(--danger-text)">Failed to load storage details: ${escapeHtml(err.message)}</p>`;
+    showToast('Storage Unavailable', 'Could not load storage details.', 'danger');
   }
 }
 
@@ -151,10 +168,41 @@ function setupShortcutsModal() {
   });
 }
 
-// Global Toast Alert Helper (Disabled globally per user specification)
-function showToast(title, desc = '', type = 'info') {
-  // Global notifications disabled
-  return;
+/**
+ * Transient status message.
+ * Every status in this app routes through here: sync started/complete/failed,
+ * document ready, cache purged, and load errors. The label carries the meaning
+ * so the message is still correct for someone who cannot see the colour rule.
+ */
+function showToast(title, desc = '', type = 'info', duration = 4200) {
+  const stack = document.getElementById('toastStack');
+  if (!stack) return;
+
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+
+  const label = document.createElement('span');
+  label.className = 'toast-label';
+  label.textContent = title;
+
+  const body = document.createElement('span');
+  body.className = 'toast-body';
+  body.textContent = desc;
+
+  toast.appendChild(label);
+  if (desc) toast.appendChild(body);
+  stack.appendChild(toast);
+
+  let timer = null;
+  const dismiss = () => {
+    if (timer) clearTimeout(timer);
+    toast.remove();
+  };
+  toast.addEventListener('click', dismiss);
+  if (duration > 0) timer = setTimeout(dismiss, duration);
+
+  // Keep the stack from growing without bound on repeated failures
+  while (stack.children.length > 4) stack.firstElementChild.remove();
 }
 
 window.showToast = showToast;

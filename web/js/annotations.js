@@ -18,7 +18,7 @@ const Annotations = {
   items: [],
   activeTool: 'none', // 'none', 'highlight', 'draw'
   activeHighlightColor: 'color-0',
-  brushColor: '#f59e0b',
+  brushColor: null, // resolved from --draw-amber in init()
   brushWidth: 3,
   brushMode: 'pen', // 'pen' or 'eraser'
   
@@ -37,6 +37,8 @@ const Annotations = {
   currentSelectionRect: null,
 
   init() {
+    if (!this.brushColor) this.brushColor = this.getDrawInk('amber');
+
     this.createDOMContainers();
     this.bindEvents();
   },
@@ -82,11 +84,11 @@ const Annotations = {
         </div>
         <div class="dock-divider"></div>
         <div class="dock-color-palette">
-          <button class="dock-color-btn active" style="background:#f59e0b;" data-color="#f59e0b" title="Amber"></button>
-          <button class="dock-color-btn" style="background:#10b981;" data-color="#10b981" title="Emerald"></button>
-          <button class="dock-color-btn" style="background:#3b82f6;" data-color="#3b82f6" title="Blue"></button>
-          <button class="dock-color-btn" style="background:#ef4444;" data-color="#ef4444" title="Red"></button>
-          <button class="dock-color-btn" style="background:#e3e6e9; border:1px solid #888;" data-color="#e3e6e9" title="White/Light"></button>
+          <button class="dock-color-btn active" data-draw="amber" title="Amber"></button>
+          <button class="dock-color-btn" data-draw="emerald" title="Emerald"></button>
+          <button class="dock-color-btn" data-draw="blue" title="Blue"></button>
+          <button class="dock-color-btn" data-draw="red" title="Red"></button>
+          <button class="dock-color-btn" data-draw="white" title="White/Light"></button>
         </div>
         <div class="dock-divider"></div>
         <div class="dock-width-group">
@@ -102,7 +104,7 @@ const Annotations = {
           <button id="drawingClearBtn" class="dock-btn btn-icon" title="Clear Page Drawings">
             <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
           </button>
-          <button id="drawingDoneBtn" class="btn btn-secondary btn-sm" style="font-size:11px; padding:3px 8px;">DONE</button>
+          <button id="drawingDoneBtn" class="btn btn-secondary btn-sm" style="font-size:0.6875rem; padding:3px 8px;">DONE</button>
         </div>
       `;
       document.body.appendChild(dock);
@@ -184,7 +186,7 @@ const Annotations = {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.dock-color-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        this.brushColor = btn.getAttribute('data-color');
+        this.brushColor = this.getDrawInk(btn.getAttribute('data-draw'));
         this.syncBrushSettings();
       });
     });
@@ -386,23 +388,45 @@ const Annotations = {
   // -------------------------------------------------------------
   // Highlighting Engine (Reflowable + PDF)
   // -------------------------------------------------------------
+
+  /**
+   * Custom properties do not cross into the Kookit iframe document, so the
+   * theme tokens are resolved here in the parent and injected as literals.
+   * Without this the highlight palette is frozen to one theme's values.
+   */
+  cssVar(name, fallback) {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name);
+    return v && v.trim() ? v.trim() : fallback;
+  },
+
+  highlightPalette() {
+    return {
+      'color-0': this.cssVar('--hl-yellow', '#fef08a'),
+      'color-1': this.cssVar('--hl-green', '#bbf7d0'),
+      'color-2': this.cssVar('--hl-teal', '#99f6e4'),
+      'color-3': this.cssVar('--hl-blue', '#bae6fd'),
+      'line-0': this.cssVar('--hl-erase', '#ef4444'),
+      ink: this.cssVar('--hl-ink', '#18181b')
+    };
+  },
+
   getHighlightStyleCss(colorCode) {
+    const p = this.highlightPalette();
+    const CLONE = '-webkit-box-decoration-break: clone; box-decoration-break: clone;';
+
     switch (colorCode) {
       case 'color-0':
-        return 'background-color: #fef08a !important; color: #18181b !important; border-radius: 2px; padding: 1px 0; -webkit-box-decoration-break: clone; box-decoration-break: clone;';
       case 'color-1':
-        return 'background-color: #bbf7d0 !important; color: #18181b !important; border-radius: 2px; padding: 1px 0; -webkit-box-decoration-break: clone; box-decoration-break: clone;';
       case 'color-2':
-        return 'background-color: #99f6e4 !important; color: #18181b !important; border-radius: 2px; padding: 1px 0; -webkit-box-decoration-break: clone; box-decoration-break: clone;';
       case 'color-3':
-        return 'background-color: #bae6fd !important; color: #18181b !important; border-radius: 2px; padding: 1px 0; -webkit-box-decoration-break: clone; box-decoration-break: clone;';
+        return `background-color: ${p[colorCode]} !important; color: ${p.ink} !important; border-radius: 2px; padding: 1px 0; ${CLONE}`;
       case 'line-0':
-        return 'border-bottom: 2.5px solid #ef4444 !important; background-color: transparent !important;';
+        return `border-bottom: 2.5px solid ${p['line-0']} !important; background-color: transparent !important;`;
       default:
         if (colorCode && (colorCode.startsWith('#') || colorCode.startsWith('rgb'))) {
-          return `background-color: ${colorCode} !important; color: #18181b !important; border-radius: 2px;`;
+          return `background-color: ${colorCode} !important; color: ${p.ink} !important; border-radius: 2px;`;
         }
-        return 'background-color: #fef08a !important; color: #18181b !important; border-radius: 2px;';
+        return `background-color: ${p['color-0']} !important; color: ${p.ink} !important; border-radius: 2px;`;
     }
   },
 
@@ -622,23 +646,18 @@ const Annotations = {
   },
 
   getPdfHighlightBg(colorCode) {
-    switch (colorCode) {
-      case 'color-0':
-        return '#fef08a'; // Yellow
-      case 'color-1':
-        return '#bbf7d0'; // Sage / Green
-      case 'color-2':
-        return '#99f6e4'; // Mint
-      case 'color-3':
-        return '#bae6fd'; // Sky Blue
-      case 'line-0':
-        return '#ef4444'; // Red
-      default:
-        if (colorCode && (colorCode.startsWith('#') || colorCode.startsWith('rgb'))) {
-          return colorCode;
-        }
-        return '#fef08a';
-    }
+    const p = this.highlightPalette();
+    if (colorCode === 'line-0') return p['line-0'];
+    if (colorCode && (colorCode.startsWith('#') || colorCode.startsWith('rgb'))) return colorCode;
+    return p[colorCode] || p['color-0'];
+  },
+
+  /**
+   * Resolve a drawing-ink token to a literal. The drawing canvas lives in the
+   * Kookit iframe, so custom properties do not reach it.
+   */
+  getDrawInk(name) {
+    return this.cssVar(`--draw-${name}`, '#f59e0b');
   },
 
   enforceHighlightStyles() {
@@ -882,7 +901,7 @@ const Annotations = {
       this.drawingCtx.beginPath();
       this.drawingCtx.lineCap = 'round';
       this.drawingCtx.lineJoin = 'round';
-      this.drawingCtx.strokeStyle = stroke.color || '#f59e0b';
+      this.drawingCtx.strokeStyle = stroke.color || this.brushColor || this.getDrawInk('amber');
       this.drawingCtx.lineWidth = stroke.width || 3;
       this.drawingCtx.globalCompositeOperation = stroke.isEraser ? 'destination-out' : 'source-over';
 
@@ -934,8 +953,8 @@ const Annotations = {
       listEl.innerHTML = `
         <div class="empty-annotations-placeholder">
           <svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-          <div style="font-size:13px; font-weight:600; margin-top:8px;">NO ANNOTATIONS FOUND</div>
-          <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">Highlight text or draw on pages to index them here.</div>
+          <div style="font-size:0.8125rem; font-weight:600; margin-top:8px;">NO ANNOTATIONS FOUND</div>
+          <div style="font-size:0.6875rem; color:var(--text-muted); margin-top:4px;">Highlight text or draw on pages to index them here.</div>
         </div>
       `;
       return;
