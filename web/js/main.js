@@ -87,20 +87,20 @@ function setupStorageModal() {
 
   if (clearCacheBtn) {
     clearCacheBtn.addEventListener('click', async () => {
-      if (!confirm('Are you sure you want to clear all cached books from disk? Cloud files will remain intact.')) return;
+      if (!confirm('Are you sure you want to clear locally cached books from this browser? Cloud files, annotations, and the library index will remain intact.')) return;
       try {
         clearCacheBtn.disabled = true;
         clearCacheBtn.textContent = 'Clearing...';
-        await API.clearAllCache();
-        showToast('Cache Purged', 'All local cached books removed.', 'info');
+        if (window.BookCache) {
+          await BookCache.clear();
+        }
+        showToast('Cache Purged', 'Browser ebook cache cleared.', 'info');
         await refreshStorageModalData();
-        await Library.refreshStatus();
-        await Library.loadFolder(State.currentFolderId);
       } catch (err) {
         showToast('Error', err.message, 'danger');
       } finally {
         clearCacheBtn.disabled = false;
-        clearCacheBtn.textContent = 'Purge All Local Cache';
+        clearCacheBtn.textContent = 'PURGE BROWSER CACHE';
       }
     });
   }
@@ -108,17 +108,24 @@ function setupStorageModal() {
 
 async function refreshStorageModalData() {
   const body = document.getElementById('storageModalBody');
+  const clearCacheBtn = document.getElementById('modalClearCacheBtn');
   if (!body) return;
 
   try {
     const status = await API.getStatus();
-    const stats = status.cacheStats || { totalBytesFormatted: '0 B', count: 0 };
+    const localStats = window.BookCache ? await BookCache.getStats() : { count: 0, totalSizeBytes: 0, totalSizeFormatted: '0 B' };
+
+    if (clearCacheBtn) {
+      clearCacheBtn.textContent = 'PURGE BROWSER CACHE';
+      clearCacheBtn.style.display = localStats.count > 0 ? 'inline-flex' : 'none';
+    }
+
     body.innerHTML = `
       <div style="display:flex; flex-direction:column; gap:16px;">
         <div style="background:var(--bg-surface-subtle); padding:16px; border-radius:var(--radius); border:1px solid var(--border-subtle);">
-          <div style="font-size:0.75rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Storage Architecture</div>
-          <div style="font-size:1.25rem; font-weight:700; color:var(--text-primary); margin:4px 0 8px;">Direct Drive Streaming</div>
-          <div style="font-size:0.8125rem; color:var(--text-secondary);">Stateless proxy streaming directly from Google Drive. 0 MB server disk used.</div>
+          <div style="font-size:0.75rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Browser Ebook Cache</div>
+          <div style="font-size:1.25rem; font-weight:700; color:var(--text-primary); margin:4px 0 8px;">${localStats.count} cached (${localStats.totalSizeFormatted})</div>
+          <div style="font-size:0.8125rem; color:var(--text-secondary);">Stored locally in IndexedDB to skip streaming downloads on reopen. Budget: ${window.BookCache ? BookCache.formatBytes(BookCache.MAX_BUDGET_BYTES) : '250 MB'}.</div>
         </div>
 
         <div style="display:flex; flex-direction:column; gap:8px; font-size:0.8125rem;">
@@ -138,7 +145,7 @@ async function refreshStorageModalData() {
       </div>
     `;
   } catch (err) {
-    body.innerHTML = `<p style="color:var(--danger-text)">Failed to load storage details: ${escapeHtml(err.message)}</p>`;
+    body.innerHTML = `<p style="color:var(--danger-text)">Failed to load storage details: ${typeof escapeHtml === 'function' ? escapeHtml(err.message) : err.message}</p>`;
     showToast('Storage Unavailable', 'Could not load storage details.', 'danger');
   }
 }

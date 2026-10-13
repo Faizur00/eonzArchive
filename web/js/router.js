@@ -97,7 +97,7 @@ const Router = {
     const title = book ? book.name : (params.name || 'Untitled Document');
     const format = book ? book.format : (params.format || 'EPUB');
 
-    await Reader.openBook(bookId, title, format, false);
+    await Reader.openBook(bookId, title, format, false, book);
   },
 
   async handleFolderRoute(folderId, params = {}) {

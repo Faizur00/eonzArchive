@@ -194,6 +194,7 @@ const Reader = {
     });
 
     window.addEventListener('beforeunload', () => this.savePositionNow());
+    window.addEventListener('pagehide', () => this.savePositionNow());
   },
 
   applySettingsToDOM() {
@@ -259,10 +260,10 @@ const Reader = {
     if (overlay) overlay.style.display = 'none';
   },
 
-  async openBook(fileId, bookName, format = 'EPUB', updateUrl = true) {
+  async openBook(fileId, bookName, format = 'EPUB', updateUrl = true, metadata = null) {
     // Retained so the error state's Try Again can retry: on failure
     // State.currentBook is never populated, so there is nothing else to retry from.
-    this._pendingOpen = { fileId, bookName, format };
+    this._pendingOpen = { fileId, bookName, format, metadata };
 
     if (updateUrl && window.Router) {
       Router.navigate(`/read/${fileId}`);
@@ -296,17 +297,52 @@ const Reader = {
     this.showLoading('RETRIEVING DOCUMENT...', 'Loading document structure...');
 
     try {
-      const startTime = Date.now();
-      const headers = {};
-      if (window.__API_TOKEN) {
-        headers['X-Request-Token'] = window.__API_TOKEN;
-      }
-      const res = await fetch(`/api/book/${fileId}/stream`, { headers });
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      const meta = metadata || (State.books && State.books.find(b => b.id === fileId)) || null;
+      const fingerprint = window.BookCache ? BookCache.getFingerprint(meta) : null;
+      let buffer = null;
+      let fromCache = false;
 
-      const buffer = await res.arrayBuffer();
-      const fetchTime = Date.now() - startTime;
-      console.log(`Document "${bookName}" fetched in ${fetchTime}ms (${(buffer.byteLength / 1024 / 1024).toFixed(2)} MB).`);
+      // 1. Attempt cache lookup if BookCache and a valid fingerprint exist
+      if (window.BookCache && fingerprint) {
+        this.showLoading('RETRIEVING DOCUMENT...', 'Checking local cache...');
+        try {
+          const cached = await BookCache.get(fileId, fingerprint);
+          if (cached && cached.buffer) {
+            buffer = cached.buffer;
+            fromCache = true;
+            console.info(`[Reader] Cache hit for "${bookName}" (${(buffer.byteLength / 1024 / 1024).toFixed(2)} MB).`);
+          }
+        } catch (cacheErr) {
+          console.warn('[Reader] Cache read error, continuing to network:', cacheErr);
+        }
+      }
+
+      // 2. Fetch from network on cache miss or invalid/missing entry
+      if (!buffer) {
+        this.showLoading('RETRIEVING DOCUMENT...', 'Streaming document from Google Drive...');
+        const startTime = Date.now();
+        const headers = {};
+        if (window.__API_TOKEN) {
+          headers['X-Request-Token'] = window.__API_TOKEN;
+        }
+        const res = await fetch(`/api/book/${fileId}/stream`, { headers });
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+
+        buffer = await res.arrayBuffer();
+        const fetchTime = Date.now() - startTime;
+        console.info(`[Reader] Document "${bookName}" fetched in ${fetchTime}ms (${(buffer.byteLength / 1024 / 1024).toFixed(2)} MB).`);
+
+        // Attempt non-blocking cache write if valid fingerprint
+        if (window.BookCache && fingerprint) {
+          BookCache.put({
+            fileId,
+            fingerprint,
+            buffer,
+            name: bookName,
+            format
+          }).catch(err => console.warn('[Reader] Cache write failed:', err));
+        }
+      }
 
       State.currentBook = {
         fileId,
@@ -320,7 +356,7 @@ const Reader = {
       }
 
       await this.buildRendition();
-      showToast('Document Ready', `Opened "${bookName}"`, 'success');
+      showToast('Document Ready', fromCache ? `Opened "${bookName}" (from local cache)` : `Opened "${bookName}"`, 'success');
     } catch (err) {
       console.error('Error reading book:', err);
       this.showLoading('Failed to Open Document', err.message, {
@@ -330,7 +366,7 @@ const Reader = {
           onClick: () => {
             if (this._pendingOpen) {
               const p = this._pendingOpen;
-              this.openBook(p.fileId, p.bookName, p.format, false);
+              this.openBook(p.fileId, p.bookName, p.format, false, p.metadata);
             }
           }
         }
@@ -928,6 +964,10 @@ const Reader = {
   },
 
   savePositionNow() {
+    if (this.savePositionTimer) {
+      clearTimeout(this.savePositionTimer);
+      this.savePositionTimer = null;
+    }
     if (State.isBuildingRendition || !State.currentBook || !State.currentRendition) return;
     if (typeof State.currentRendition.getPosition !== 'function') return;
     try {
