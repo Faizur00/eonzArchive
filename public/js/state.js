@@ -36,6 +36,7 @@ const State = {
     this.theme = theme;
     localStorage.setItem('eonz.theme', theme);
     document.documentElement.setAttribute('data-theme', theme);
+    updateFavicon(theme);
   },
 
   setViewMode(mode) {
@@ -60,3 +61,23 @@ const State = {
 };
 
 window.State = State;
+
+/**
+ * Point the icon links at the variant that matches the given theme.
+ *
+ * The markup starts out with a prefers-color-scheme media query on each icon
+ * link, which covers the system appearance but not a stored override. Setting
+ * the href from here pins the icon to the chosen theme, and dropping the media
+ * query stops the browser from picking a second, conflicting icon. A link with
+ * no variant pair, such as the mask icon, is left alone.
+ */
+function updateFavicon(theme) {
+  const attribute = theme === 'dark' ? 'data-dark-href' : 'data-light-href';
+  const links = document.querySelectorAll('link[data-light-href][data-dark-href]');
+  for (const link of links) {
+    link.setAttribute('href', link.getAttribute(attribute));
+    link.removeAttribute('media');
+  }
+}
+
+window.updateFavicon = updateFavicon;

@@ -178,13 +178,12 @@ if (fs.existsSync(path.join(publicDir, 'kookit'))) {
 
 // Browsers probe /favicon.ico on their own, with no <link> tag. Without this
 // route the SPA catch-all answers it with the HTML shell and a 200, so the
-// browser caches a broken icon. Serve the icon as an image, or fail cleanly.
+// browser caches a broken icon. There is no .ico file: the probe gets the SVG
+// itself, which browsers accept at this path. A probe carries no theme
+// information, so this always answers the light variant; the theme-aware links
+// in index.html take over in every browser that reads those.
 app.get('/favicon.ico', (req, res) => {
-  const icoPath = path.join(__dirname, 'web', 'favicon.ico');
-  if (fs.existsSync(icoPath)) {
-    return res.sendFile(icoPath, { maxAge: '7d' });
-  }
-  const svgPath = path.join(__dirname, 'web', 'icon3.svg');
+  const svgPath = path.join(__dirname, 'web', 'icon-light.svg');
   if (fs.existsSync(svgPath)) {
     return res.type('image/svg+xml').set('Cache-Control', 'public, max-age=604800').sendFile(svgPath);
   }
