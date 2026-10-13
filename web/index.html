@@ -8,25 +8,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1b1e21">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f0e6">
 
-  <!-- icon-light.svg and icon-dark.svg are the two sources. The .png files
-       next to them are raster exports of the same art, kept only for Safari and
-       for the home screen on a phone, which ignore SVG icons.
-       The media queries pick the variant that matches the system appearance, so
-       the icon is right before any script runs. data-light-href and
-       data-dark-href let State.setTheme pin the icon to the chosen theme for
-       people who override the system setting; it then drops the media query. -->
-  <link rel="icon" type="image/svg+xml" href="/icon-light.svg" media="(prefers-color-scheme: light)" data-light-href="/icon-light.svg" data-dark-href="/icon-dark.svg">
-  <link rel="icon" type="image/svg+xml" href="/icon-dark.svg" media="(prefers-color-scheme: dark)" data-light-href="/icon-light.svg" data-dark-href="/icon-dark.svg">
-  <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png" media="(prefers-color-scheme: light)" data-light-href="/icon-32.png" data-dark-href="/icon-32-dark.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="/icon-32-dark.png" media="(prefers-color-scheme: dark)" data-light-href="/icon-32.png" data-dark-href="/icon-32-dark.png">
-  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" media="(prefers-color-scheme: light)" data-light-href="/icon-192.png" data-dark-href="/icon-192-dark.png">
-  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192-dark.png" media="(prefers-color-scheme: dark)" data-light-href="/icon-192.png" data-dark-href="/icon-192-dark.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png" media="(prefers-color-scheme: light)" data-light-href="/icon-180.png" data-dark-href="/icon-180-dark.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/icon-180-dark.png" media="(prefers-color-scheme: dark)" data-light-href="/icon-180.png" data-dark-href="/icon-180-dark.png">
-  <!-- A mask icon is monochrome by definition, so it uses the bare letterform
-       with no disc. The browser tints it with the color attribute and follows
-       the theme itself, so this link needs no variant. -->
-  <link rel="mask-icon" href="/icon-mask.svg" color="#f4f0e6">
+  <link rel="icon" type="image/svg+xml" href="/iconv6_fix.svg">
   <!-- Design System Stylesheets -->
   <link rel="stylesheet" href="/css/variables.css">
   <link rel="stylesheet" href="/css/components.css">

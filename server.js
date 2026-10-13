@@ -183,7 +183,7 @@ if (fs.existsSync(path.join(publicDir, 'kookit'))) {
 // information, so this always answers the light variant; the theme-aware links
 // in index.html take over in every browser that reads those.
 app.get('/favicon.ico', (req, res) => {
-  const svgPath = path.join(__dirname, 'web', 'icon-light.svg');
+  const svgPath = path.join(__dirname, 'web', 'iconv6_fix.svg');
   if (fs.existsSync(svgPath)) {
     return res.type('image/svg+xml').set('Cache-Control', 'public, max-age=604800').sendFile(svgPath);
   }
