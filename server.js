@@ -173,10 +173,8 @@ app.use('/kookit', express.static(path.join(__dirname, 'kookit')));
 // itself, which browsers accept at this path.
 app.get('/favicon.ico', (req, res) => {
   const candidates = [
-    path.join(__dirname, 'web', 'iconv7_light.svg'),
-    path.join(__dirname, 'web', 'iconv7_dark.svg'),
-    path.join(__dirname, 'web', 'icon-light.svg'),
-    path.join(__dirname, 'web', 'icon-dark.svg')
+    path.join(__dirname, 'web', 'ico_final_light.svg'),
+    path.join(__dirname, 'web', 'ico_final_dark.svg')
   ];
   const svgPath = candidates.find(p => fs.existsSync(p));
   if (svgPath) {
@@ -420,8 +418,19 @@ app.get('/api/book/:id/stream', async (req, res) => {
   }
 });
 
-// Fallback to the SPA shell (with embedded API token) for any unmatched route
-app.use(serveApp);
+// Fallback: serve the SPA shell for page routes. A path that looks like a static
+// asset gets a 404 instead, so a missing file fails loudly. Without this, a
+// missing asset resolves to the HTML shell with a 200 and breaks the requesting
+// script or stylesheet (for example "Unexpected token '<'").
+app.use((req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    return next();
+  }
+  if (path.extname(req.path)) {
+    return res.status(404).type('text/plain').send('Not found');
+  }
+  return serveApp(req, res);
+});
 
 // Start Server when run directly
 if (require.main === module) {

@@ -69,7 +69,7 @@ window.State = State;
  * Uses window.__FAVICON_CONFIG defined in index.html as the single source of truth.
  */
 function updateFavicon(theme) {
-  const cfg = window.__FAVICON_CONFIG || { light: '/iconv7_light.svg', dark: '/iconv7_dark.svg' };
+  const cfg = window.__FAVICON_CONFIG || { light: '/ico_final_light.svg', dark: '/ico_final_dark.svg' };
   const targetHref = theme === 'dark' ? cfg.dark : cfg.light;
   
   // If the user has explicitly chosen an in-app theme override, remove media queries so it doesn't conflict
