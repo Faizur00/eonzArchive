@@ -148,9 +148,7 @@ app.use('/api', async (req, res, next) => {
 
 // Serve the SPA shell with the API token embedded for the same-origin frontend.
 function serveApp(req, res) {
-  const templatePath = fs.existsSync(path.join(__dirname, 'web', 'index.html'))
-    ? path.join(__dirname, 'web', 'index.html')
-    : path.join(__dirname, 'public', 'index.html');
+  const templatePath = path.join(__dirname, 'web', 'index.html');
   const html = fs.readFileSync(templatePath, 'utf8');
   res.type('html').send(
     html.replace('</head>', `<script>window.__API_TOKEN = ${JSON.stringify(API_TOKEN)};</script></head>`)
@@ -163,18 +161,11 @@ app.get('/library', (req, res) => res.redirect('/#/'));
 app.get('/folder/:id', (req, res) => res.redirect(`/#/folder/${encodeURIComponent(req.params.id)}`));
 app.get('/read/:id', (req, res) => res.redirect(`/#/read/${encodeURIComponent(req.params.id)}`));
 
-// Serve static frontend from public/ and web/ (index.html is handled by serveApp so the token is embedded)
-const publicDir = path.join(__dirname, 'public');
-if (fs.existsSync(publicDir)) {
-  app.use(express.static(publicDir, { index: false }));
-}
+// Serve static frontend from web/ (index.html is handled by serveApp so the token is embedded)
 app.use(express.static(path.join(__dirname, 'web'), { index: false }));
 
 // Serve kookit library assets
 app.use('/kookit', express.static(path.join(__dirname, 'kookit')));
-if (fs.existsSync(path.join(publicDir, 'kookit'))) {
-  app.use('/kookit', express.static(path.join(publicDir, 'kookit')));
-}
 
 // Browsers probe /favicon.ico on their own, with no <link> tag. Without this
 // route the SPA catch-all answers it with the HTML shell and a 200, so the
