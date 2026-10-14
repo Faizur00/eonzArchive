@@ -69,13 +69,23 @@ window.State = State;
  * Uses window.__FAVICON_CONFIG defined in index.html as the single source of truth.
  */
 function updateFavicon(theme) {
-  const cfg = window.__FAVICON_CONFIG || { light: '/icon-light.svg', dark: '/icon-dark.svg' };
+  const cfg = window.__FAVICON_CONFIG || { light: '/iconv7_light.svg', dark: '/iconv7_dark.svg' };
   const targetHref = theme === 'dark' ? cfg.dark : cfg.light;
-  let link = document.getElementById('appFavicon') || document.querySelector("link[rel*='icon']");
-  if (link) {
-    link.setAttribute('href', targetHref);
+  
+  // If the user has explicitly chosen an in-app theme override, remove media queries so it doesn't conflict
+  const favLight = document.getElementById('faviconLight');
+  const favDark = document.getElementById('faviconDark');
+  const appFavicon = document.getElementById('appFavicon');
+
+  if (localStorage.getItem('eonz.theme')) {
+    if (favLight) favLight.remove();
+    if (favDark) favDark.remove();
+  }
+
+  if (appFavicon) {
+    appFavicon.setAttribute('href', targetHref);
   } else {
-    link = document.createElement('link');
+    const link = document.createElement('link');
     link.id = 'appFavicon';
     link.rel = 'icon';
     link.type = 'image/svg+xml';

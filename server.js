@@ -172,9 +172,13 @@ app.use('/kookit', express.static(path.join(__dirname, 'kookit')));
 // browser caches a broken icon. There is no .ico file: the probe gets the SVG
 // itself, which browsers accept at this path.
 app.get('/favicon.ico', (req, res) => {
-  const defaultIcon = path.join(__dirname, 'web', 'icon-light.svg');
-  const fallbackIcon = path.join(__dirname, 'web', 'icon-dark.svg');
-  const svgPath = fs.existsSync(defaultIcon) ? defaultIcon : (fs.existsSync(fallbackIcon) ? fallbackIcon : null);
+  const candidates = [
+    path.join(__dirname, 'web', 'iconv7_light.svg'),
+    path.join(__dirname, 'web', 'iconv7_dark.svg'),
+    path.join(__dirname, 'web', 'icon-light.svg'),
+    path.join(__dirname, 'web', 'icon-dark.svg')
+  ];
+  const svgPath = candidates.find(p => fs.existsSync(p));
   if (svgPath) {
     return res.type('image/svg+xml').set('Cache-Control', 'public, max-age=604800').sendFile(svgPath);
   }
