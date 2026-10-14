@@ -5,10 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>EONZ ARCHIVE</title>
   <meta name="description" content="Personal archival library repository and reader.">
-  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1b1e21">
-  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f0e6">
+  <!-- ========================================================
+       FAVICON CONFIGURATION
+       Configure light and dark icons here.
+       ======================================================== -->
+  <script>
+    window.__FAVICON_CONFIG = {
+      light: "iconv7_light.svg",
+      dark: "iconv7_dark.svg",
+    };
+    (function() {
+      const cfg = window.__FAVICON_CONFIG;
+      const media = window.matchMedia('(prefers-color-scheme: dark)');
+      const stored = localStorage.getItem('eonz.theme');
+      const isDark = stored ? stored === 'dark' : media.matches;
+      const initialHref = isDark ? cfg.dark : cfg.light;
+      document.write('<link id="appFavicon" rel="icon" type="image/svg+xml" href="' + initialHref + '">');
+    })();
+  </script>
 
-  <link rel="icon" type="image/svg+xml" href="/iconv5darkmode.svg">
   <!-- Design System Stylesheets -->
   <link rel="stylesheet" href="/css/variables.css">
   <link rel="stylesheet" href="/css/components.css">
