@@ -65,21 +65,34 @@ const State = {
 window.State = State;
 
 /**
- * Point the icon links at the variant that matches the given theme.
- *
- * The markup starts out with a prefers-color-scheme media query on each icon
- * link, which covers the system appearance but not a stored override. Setting
- * the href from here pins the icon to the chosen theme, and dropping the media
- * query stops the browser from picking a second, conflicting icon. A link with
- * no variant pair, such as the mask icon, is left alone.
+ * Point the favicon at the variant that matches the given theme.
+ * Uses window.__FAVICON_CONFIG defined in index.html as the single source of truth.
  */
 function updateFavicon(theme) {
-  const attribute = theme === 'dark' ? 'data-dark-href' : 'data-light-href';
-  const links = document.querySelectorAll('link[data-light-href][data-dark-href]');
-  for (const link of links) {
-    link.setAttribute('href', link.getAttribute(attribute));
-    link.removeAttribute('media');
+  const cfg = window.__FAVICON_CONFIG || { light: '/iconv7_light.svg', dark: '/iconv7_dark.svg' };
+  const targetHref = theme === 'dark' ? cfg.dark : cfg.light;
+  
+  // If the user has explicitly chosen an in-app theme override, remove media queries so it doesn't conflict
+  const favLight = document.getElementById('faviconLight');
+  const favDark = document.getElementById('faviconDark');
+  const appFavicon = document.getElementById('appFavicon');
+
+  if (localStorage.getItem('eonz.theme')) {
+    if (favLight) favLight.remove();
+    if (favDark) favDark.remove();
+  }
+
+  if (appFavicon) {
+    appFavicon.setAttribute('href', targetHref);
+  } else {
+    const link = document.createElement('link');
+    link.id = 'appFavicon';
+    link.rel = 'icon';
+    link.type = 'image/svg+xml';
+    link.href = targetHref;
+    document.head.appendChild(link);
   }
 }
 
 window.updateFavicon = updateFavicon;
+
