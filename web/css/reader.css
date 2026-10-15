@@ -799,50 +799,80 @@
     margin: 0 !important;
     border: none;
     box-sizing: border-box;
-    padding: 12px 18px;
+    padding: 12px 16px;
   }
   .nav-hotspot {
     display: none !important;
   }
+
+  /* 3-Zone Decluttered Reader Top Bar */
   .reader-top-bar {
-    padding: 6px 10px;
-    gap: 6px;
+    padding: 8px 12px;
+    gap: 8px;
+    min-height: 44px;
     transition: transform var(--transition-normal);
   }
   .reader-bar-left {
-    gap: 6px;
+    gap: 8px;
     flex: 1;
     min-width: 0;
   }
+  .reader-book-info {
+    min-width: 0;
+  }
+  #readerFormatBadge {
+    display: none;
+  }
   .reader-book-title {
-    max-width: 130px;
-    font-size:0.8125rem;
+    max-width: 150px;
+    font-size: 0.84375rem;
+    font-weight: 600;
   }
   .reader-bar-center {
     flex: 0 0 auto;
   }
   #tocToggleBtn {
-    padding: 4px 8px;
-    font-size:0.6875rem;
+    padding: 6px 10px;
+    min-height: 34px;
+    font-size: 0.6875rem;
   }
   .reader-bar-right {
-    gap: 4px;
+    gap: 6px;
     flex: 0 0 auto;
+    justify-content: flex-end;
   }
+
+  /* Hide crowded desktop toolbar controls on mobile */
+  .reader-annotation-tools,
+  #readerModeSelect,
+  #pdfZoomControls,
   #fullscreenToggleBtn {
     display: none !important;
   }
-  .reader-annotation-tools .annot-tool-btn span:not(.annot-count-badge) {
-    display: none;
+
+  #readerSettingsBtn,
+  #readerToolsBtn {
+    display: inline-flex !important;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
   }
-  .reader-annotation-tools .annot-tool-btn {
-    padding: 8px;
-    min-height: 28px;
-    min-width: 28px;
-    justify-content: center;
+
+  /* One-handed bottom navigation bar */
+  .reader-bottom-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-left: 18px;
+    padding-right: 18px;
+    padding-bottom: env(safe-area-inset-bottom);
+    min-height: 48px;
+    background: var(--reader-toolbar-bg);
+    border-top: 1px solid var(--reader-border);
+    z-index: 600;
+    flex-shrink: 0;
+    transition: transform var(--transition-normal);
   }
-  /* One-handed reach: the bottom bar has the room, so the real target grows.
-     The glyph grows with it, otherwise a 13px chevron floats in a 44px button. */
   .reader-bottom-bar .btn-icon {
     width: 44px;
     height: 44px;
@@ -851,31 +881,15 @@
     width: 20px;
     height: 20px;
   }
-  #readerModeSelect {
-    padding: 4px 18px 4px 4px;
-    font-size:0.65625rem;
-  }
-  .reader-bottom-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-left: 16px;
-    padding-right: 16px;
-    padding-bottom: env(safe-area-inset-bottom);
-    min-height: 44px;
-    background: var(--reader-toolbar-bg);
-    border-top: 1px solid var(--reader-border);
-    z-index: 600;
-    flex-shrink: 0;
-    transition: transform var(--transition-normal);
-  }
   .reader-bottom-info {
     font-family: var(--font-mono);
-    font-size:0.75rem;
+    font-size: 0.78125rem;
     color: var(--reader-text-muted);
     letter-spacing: 0.5px;
     user-select: none;
   }
+
+  /* Distraction-free reading auto-hide */
   #readerView.bars-hidden .reader-top-bar {
     transform: translateY(-100%);
     position: absolute;
@@ -892,27 +906,69 @@
     bottom: 0;
     pointer-events: none;
   }
+
+  /* Typography / Appearance Mobile Bottom Sheet */
   .settings-popover {
     position: fixed;
     top: auto;
-    bottom: calc(env(safe-area-inset-bottom) + 52px);
-    left: 12px;
-    right: 12px;
-    width: auto;
-    max-width: none;
-    border: 1px solid var(--border-control);
-    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: 100%;
+    border: none;
+    border-top: 1px solid var(--border-medium);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.45);
     z-index: 750;
+    padding: 0 16px max(20px, env(safe-area-inset-bottom));
+    transform: translateY(100%);
+    transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+    max-height: 85vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .settings-popover.open {
+    transform: translateY(0);
   }
   .settings-popover .settings-group:has(.width-presets) {
     display: none;
   }
+
+  /* Drawing dock positioned above bottom bar */
+  .drawing-dock {
+    bottom: calc(env(safe-area-inset-bottom) + 56px);
+    width: calc(100vw - 20px);
+    max-width: 380px;
+    padding: 6px 10px;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .drawing-dock::-webkit-scrollbar {
+    display: none;
+  }
+  .drawing-dock.open {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* Mobile drawers with generous tap targets */
   .toc-drawer {
-    width: 85vw;
-    max-width: 340px;
+    width: 90vw;
+    max-width: 360px;
+  }
+  .toc-item {
+    padding: 12px 18px;
+    min-height: 44px;
+    font-size: 0.875rem;
   }
   .annotations-drawer {
-    width: 88vw;
-    max-width: 360px;
+    width: 92vw;
+    max-width: 380px;
+  }
+  .annotation-item {
+    padding: 12px 14px;
   }
 }

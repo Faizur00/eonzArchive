@@ -474,11 +474,204 @@ html, body {
   }
 }
 
+/* ==========================================================================
+   MOBILE DISPLAY UTILITIES & BOTTOM SHEETS
+   ========================================================================== */
+.mobile-only-btn,
+.mobile-only-flex,
+.mobile-only-block {
+  display: none !important;
+}
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 740;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+.sheet-backdrop.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.mobile-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-height: 85vh;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-medium);
+  border-radius: 12px 12px 0 0;
+  z-index: 750;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(100%);
+  transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.45);
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  overflow: hidden;
+}
+.mobile-sheet.open {
+  transform: translateY(0);
+}
+
+.sheet-handle-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 4px;
+  cursor: grab;
+}
+.sheet-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-strong);
+}
+
+.sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.sheet-title {
+  font-family: var(--font-heading);
+  font-size: 0.8125rem;
+  letter-spacing: 0.8px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: uppercase;
+}
+
+.sheet-body {
+  padding: 14px 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sheet-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sheet-label {
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.sheet-segment-group {
+  display: flex;
+  border: 1px solid var(--border-control);
+  background: var(--bg-surface-subtle);
+}
+.sheet-segment-btn {
+  flex: 1;
+  padding: 10px 8px;
+  min-height: 40px;
+  font-family: var(--font-ui);
+  font-size: 0.71875rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.sheet-segment-btn.active {
+  background: var(--bg-surface-elevated);
+  color: var(--text-primary);
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+
+.sheet-grid-tools {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.sheet-action-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 8px;
+  min-height: 72px;
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border-control);
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-decoration: none;
+  font-family: var(--font-ui);
+  font-size: 0.65625rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  transition: all var(--transition-fast);
+}
+.sheet-action-card.active {
+  background: var(--bg-surface-elevated);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+  outline: 2px solid var(--text-primary);
+}
+
+.sheet-zoom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.sheet-zoom-row .btn {
+  flex: 1;
+  min-height: 38px;
+}
+
 @media (max-width: 768px) {
+  .mobile-only-btn {
+    display: inline-flex !important;
+  }
+  .mobile-only-flex {
+    display: flex !important;
+  }
+  .mobile-only-block {
+    display: block !important;
+  }
+
   .toast-stack {
     left: 12px;
     right: 12px;
     bottom: calc(env(safe-area-inset-bottom) + 56px);
     max-width: none;
   }
+
+  /* Modals adapt to ergonomic bottom sheets on mobile */
+  .modal-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .modal-card {
+    max-width: 100%;
+    border-radius: 14px 14px 0 0;
+    border-bottom: none;
+    border-left: none;
+    border-right: none;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
 }
+

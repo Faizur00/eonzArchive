@@ -86,7 +86,7 @@
           <svg class="icon icon-sm" viewBox="0 0 24 24">
             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
           </svg>
-          SYNC
+          <span class="btn-text">SYNC</span>
         </button>
 
         <button id="storageManagerBtn" class="btn btn-ghost btn-sm btn-icon" title="Storage Status">
@@ -238,6 +238,15 @@
           </svg>
         </button>
 
+        <!-- Mobile More Tools Button -->
+        <button id="readerToolsBtn" class="btn btn-secondary btn-sm btn-icon mobile-only-btn" title="Reader Controls" onclick="Reader.toggleToolsSheet(true)">
+          <svg class="icon icon-sm" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="1.5"/>
+            <circle cx="19" cy="12" r="1.5"/>
+            <circle cx="5" cy="12" r="1.5"/>
+          </svg>
+        </button>
+
         <button id="fullscreenToggleBtn" class="btn btn-ghost btn-sm btn-icon" title="Fullscreen">
           <svg class="icon icon-sm" viewBox="0 0 24 24">
             <path d="M8 3H5v3m14 0V3h-3m0 18h3v-3M3 16v3h3"/>
@@ -333,8 +342,19 @@
       </div>
     </aside>
 
+    <!-- Reader Settings Backdrop (Mobile) -->
+    <div id="readerSettingsBackdrop" class="sheet-backdrop" onclick="Reader.toggleSettingsPopover(false)"></div>
+
     <!-- Appearance / Settings Popover -->
     <div id="readerSettingsPopover" class="settings-popover">
+      <div class="sheet-handle-wrap mobile-only-flex">
+        <div class="sheet-handle"></div>
+      </div>
+      <div class="sheet-header mobile-only-flex">
+        <h4 class="sheet-title">APPEARANCE & TYPE</h4>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="Reader.toggleSettingsPopover(false)" title="Close">✕</button>
+      </div>
+
       <div class="settings-group">
         <div class="settings-label">THEME</div>
         <button id="readerThemeToggle" class="reader-theme-toggle">DARK MODE</button>
@@ -377,6 +397,58 @@
             <option value="justify">JUSTIFY</option>
             <option value="book">BOOK DEFAULT</option>
           </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reader Controls Bottom Sheet (Mobile) -->
+    <div id="readerToolsBackdrop" class="sheet-backdrop" onclick="Reader.toggleToolsSheet(false)"></div>
+    <div id="readerToolsSheet" class="mobile-sheet">
+      <div class="sheet-handle-wrap">
+        <div class="sheet-handle"></div>
+      </div>
+      <div class="sheet-header">
+        <h4 class="sheet-title">READER CONTROLS</h4>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="Reader.toggleToolsSheet(false)" title="Close">✕</button>
+      </div>
+      <div class="sheet-body">
+        <!-- Display Mode -->
+        <div class="sheet-section">
+          <div class="sheet-label">PAGINATION MODE</div>
+          <div class="sheet-segment-group">
+            <button id="sheetModeSingleBtn" class="sheet-segment-btn active" onclick="Reader.setModeFromSheet('single')">PAGE BY PAGE</button>
+            <button id="sheetModeScrollBtn" class="sheet-segment-btn" onclick="Reader.setModeFromSheet('scroll')">CONTINUOUS SCROLL</button>
+          </div>
+        </div>
+
+        <!-- Annotation Tools -->
+        <div class="sheet-section">
+          <div class="sheet-label">MARKUP & ANNOTATIONS</div>
+          <div class="sheet-grid-tools">
+            <button id="sheetHighlightBtn" class="sheet-action-card annot-tool-btn" data-tool="highlight" onclick="Annotations.setToolMode(Annotations.activeTool === 'highlight' ? 'none' : 'highlight'); Reader.toggleToolsSheet(false);">
+              <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m18 2 4 4-14 14H4v-4L18 2z"/><line x1="14.5" y1="5.5" x2="18.5" y2="9.5"/></svg>
+              <span>HIGHLIGHT</span>
+            </button>
+            <button id="sheetDrawBtn" class="sheet-action-card annot-tool-btn" data-tool="draw" onclick="Annotations.setToolMode(Annotations.activeTool === 'draw' ? 'none' : 'draw'); Reader.toggleToolsSheet(false);">
+              <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg>
+              <span>FREE DRAW</span>
+            </button>
+            <button id="sheetAnnotationsDrawerBtn" class="sheet-action-card" onclick="Annotations.toggleDrawer(true); Reader.toggleToolsSheet(false);">
+              <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10M6 10h10M6 14h6"/></svg>
+              <span>ALL NOTES (<span id="sheetAnnotCount">0</span>)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- PDF Zoom Section (Shown when PDF is active) -->
+        <div id="sheetPdfZoomSection" class="sheet-section" style="display: none;">
+          <div class="sheet-label">PDF ZOOM</div>
+          <div class="sheet-zoom-row">
+            <button class="btn btn-secondary btn-sm" onclick="Reader.zoomPdf(0.85); Reader.updateSheetZoomLabel();">ZOOM OUT (−)</button>
+            <span id="sheetPdfZoomLabel" style="font-family:var(--font-mono); font-size:12px; font-weight:600; padding:0 8px;">100%</span>
+            <button class="btn btn-secondary btn-sm" onclick="Reader.zoomPdf(1.15); Reader.updateSheetZoomLabel();">ZOOM IN (+)</button>
+            <button class="btn btn-secondary btn-sm" onclick="Reader.resetPdfZoom(); Reader.updateSheetZoomLabel();">FIT PAGE</button>
+          </div>
         </div>
       </div>
     </div>
