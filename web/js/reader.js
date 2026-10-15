@@ -54,11 +54,11 @@ const Reader = {
     if (settingsBtn && popover) {
       settingsBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        popover.classList.toggle('open');
+        this.toggleSettingsPopover();
       });
       document.addEventListener('click', (e) => {
-        if (!popover.contains(e.target) && e.target !== settingsBtn) {
-          popover.classList.remove('open');
+        if (!popover.contains(e.target) && e.target !== settingsBtn && popover.classList.contains('open')) {
+          this.toggleSettingsPopover(false);
         }
       });
     }
@@ -171,6 +171,10 @@ const Reader = {
         } else if (e.key === 'Escape') {
           if (this.isFootnoteOpen()) {
             this.closeFootnote();
+          } else if (document.getElementById('readerToolsSheet')?.classList.contains('open')) {
+            this.toggleToolsSheet(false);
+          } else if (document.getElementById('readerSettingsPopover')?.classList.contains('open')) {
+            this.toggleSettingsPopover(false);
           } else if (document.getElementById('annotationsDrawer')?.classList.contains('open')) {
             if (window.Annotations) Annotations.toggleDrawer(false);
           } else if (document.getElementById('tocDrawer')?.classList.contains('open')) {
@@ -1011,6 +1015,8 @@ const Reader = {
   closeReader() {
     this.closeFootnote();
     this.toggleTOC(false);
+    this.toggleSettingsPopover(false);
+    this.toggleToolsSheet(false);
     this.savePositionNow();
 
     if (window.location.hash.startsWith('#/read/')) {
@@ -1027,6 +1033,8 @@ const Reader = {
   exitReaderDOM() {
     this.closeFootnote();
     this.toggleTOC(false);
+    this.toggleSettingsPopover(false);
+    this.toggleToolsSheet(false);
     this.savePositionNow();
 
     if (window.Annotations) {
@@ -1042,6 +1050,69 @@ const Reader = {
     if (pageArea) pageArea.innerHTML = '';
     State.currentRendition = null;
     State.currentBook = null;
+  },
+
+  toggleSettingsPopover(open) {
+    const popover = document.getElementById('readerSettingsPopover');
+    const backdrop = document.getElementById('readerSettingsBackdrop');
+    const shouldOpen = (open !== undefined) ? open : !popover?.classList.contains('open');
+    if (popover) popover.classList.toggle('open', shouldOpen);
+    if (backdrop) backdrop.classList.toggle('open', shouldOpen);
+  },
+
+  toggleToolsSheet(open) {
+    const sheet = document.getElementById('readerToolsSheet');
+    const backdrop = document.getElementById('readerToolsBackdrop');
+    const shouldOpen = (open !== undefined) ? open : !sheet?.classList.contains('open');
+    if (sheet) sheet.classList.toggle('open', shouldOpen);
+    if (backdrop) backdrop.classList.toggle('open', shouldOpen);
+    if (shouldOpen) {
+      this.syncToolsSheetState();
+    }
+  },
+
+  syncToolsSheetState() {
+    // Sync mode buttons
+    const mode = State.readerMode;
+    const singleBtn = document.getElementById('sheetModeSingleBtn');
+    const scrollBtn = document.getElementById('sheetModeScrollBtn');
+    if (singleBtn) singleBtn.classList.toggle('active', mode === 'single' || mode === 'double');
+    if (scrollBtn) scrollBtn.classList.toggle('active', mode === 'scroll');
+
+    // Sync annotation count
+    const sheetCount = document.getElementById('sheetAnnotCount');
+    const badge = document.getElementById('annotationsCountBadge');
+    if (sheetCount && badge) {
+      sheetCount.textContent = badge.textContent || '0';
+    }
+
+    // PDF Zoom visibility
+    const pdfSection = document.getElementById('sheetPdfZoomSection');
+    const isPdf = State.currentBook && State.currentBook.format === 'PDF';
+    if (pdfSection) {
+      pdfSection.style.display = isPdf ? 'block' : 'none';
+      this.updateSheetZoomLabel();
+    }
+  },
+
+  async setModeFromSheet(mode) {
+    State.readerMode = mode;
+    localStorage.setItem('eonz.reader.mode', State.readerMode);
+    const modeSelect = document.getElementById('readerModeSelect');
+    if (modeSelect) modeSelect.value = mode;
+    this.syncToolsSheetState();
+    if (State.currentBook) {
+      await this.rebuildRendition();
+    }
+    this.toggleToolsSheet(false);
+  },
+
+  updateSheetZoomLabel() {
+    const label = document.getElementById('sheetPdfZoomLabel');
+    const desktopLabel = document.getElementById('pdfZoomLabel');
+    if (label && desktopLabel) {
+      label.textContent = desktopLabel.textContent;
+    }
   }
 };
 

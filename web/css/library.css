@@ -382,43 +382,76 @@
 
 @media (max-width: 768px) {
   #libraryView {
-    padding-top: max(16px, env(safe-area-inset-top));
+    padding-top: max(14px, env(safe-area-inset-top));
     padding-left: max(12px, env(safe-area-inset-left));
     padding-right: max(12px, env(safe-area-inset-right));
-    padding-bottom: max(60px, env(safe-area-inset-bottom));
+    padding-bottom: max(64px, env(safe-area-inset-bottom));
   }
+
+  /* Single-line sleek header */
   .app-header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-    margin-bottom: 16px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 0;
+    margin-bottom: 14px;
   }
   .brand-section {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
   }
   .brand-title-wrap h1 {
-    font-size:1.125rem;
-    letter-spacing: 1.5px;
+    font-size: 1.0625rem;
+    letter-spacing: 1.2px;
+    white-space: nowrap;
+  }
+  .brand-subtitle {
+    font-size: 0.625rem;
+    gap: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .brand-subtitle .status-pill {
+    padding: 1px 4px;
+    font-size: 0.5625rem;
+    letter-spacing: 0.2px;
   }
   .header-actions {
     display: flex;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: flex-end;
     gap: 6px;
-    width: 100%;
+    width: auto;
+    flex-shrink: 0;
+  }
+  #syncBtn .btn-text {
+    display: none;
+  }
+  #syncBtn {
+    padding: 0;
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    justify-content: center;
   }
   #shortcutsBtn {
     display: none !important;
   }
+
+  /* Controls & Filter Bar */
   .controls-bar {
+    display: flex;
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
-    margin-bottom: 16px;
-    padding: 6px 0;
+    margin-bottom: 14px;
+    padding: 4px 0 8px;
   }
   .filter-pills {
     display: flex;
@@ -430,9 +463,17 @@
     scrollbar-width: none;
     -ms-overflow-style: none;
     padding-bottom: 2px;
+    mask-image: linear-gradient(to right, black 90%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
   }
   .filter-pills::-webkit-scrollbar {
     display: none;
+  }
+  .pill-btn {
+    min-height: 32px;
+    padding: 6px 10px;
+    font-size: 0.6875rem;
+    flex-shrink: 0;
   }
   .controls-right-group {
     display: flex;
@@ -442,57 +483,128 @@
   }
   .controls-right-group .select-field {
     flex: 1;
-    max-width: 220px;
+    max-width: 180px;
+    min-height: 32px;
+    font-size: 0.6875rem;
   }
+  .view-btn {
+    min-height: 32px;
+    padding: 6px 8px;
+  }
+
+  .breadcrumbs-bar {
+    font-size: 0.6875rem;
+    margin-bottom: 12px;
+  }
+
+  /* Folders as a compact horizontal scrolling strip (saves ~200px) */
   .folders-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    scroll-snap-type: x mandatory;
     gap: 8px;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
+    padding-bottom: 2px;
+  }
+  .folders-grid::-webkit-scrollbar {
+    display: none;
   }
   .folder-card {
-    padding: 8px 10px;
+    flex: 0 0 auto;
+    aspect-ratio: auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 8px 12px;
     gap: 8px;
+    min-width: 110px;
+    max-width: 180px;
+    scroll-snap-align: start;
   }
   .folder-icon .icon {
-    width: 32px;
-    height: 32px;
+    width: 18px;
+    height: 18px;
   }
   .folder-name {
-    font-size:0.71875rem;
+    font-size: 0.71875rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+    display: block;
+    -webkit-line-clamp: unset;
   }
+
+  /* Book Cards - Single-column Swiss archival layout on mobile */
   .books-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .book-card {
+    border: 1px solid var(--border-medium);
+    background: var(--bg-surface);
   }
   .book-cover {
-    height: 120px;
-    padding: 10px;
+    height: auto;
+    min-height: 64px;
+    padding: 12px 14px 8px;
+    gap: 8px;
+  }
+  .cover-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .cover-title-area {
+    margin-top: 6px;
   }
   .cover-book-title {
-    font-size:0.84375rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.35;
     -webkit-line-clamp: 2;
-    line-clamp: 2;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
   .book-card-body {
-    padding: 10px;
+    padding: 10px 14px 12px;
     gap: 8px;
   }
   .book-meta-row {
-    font-size:0.625rem;
-  }
-  .book-actions-row {
-    padding-top: 6px;
-  }
-.book-actions-row .btn-sm {
-    padding: 8px 8px;
-    min-height: 31px;
     font-size: 0.65625rem;
   }
+  .book-actions-row {
+    padding-top: 8px;
+    gap: 8px;
+  }
+  .book-actions-row .btn-primary {
+    min-height: 38px;
+    font-size: 0.75rem;
+    letter-spacing: 0.6px;
+    padding: 8px 16px;
+  }
+  .book-actions-row .btn-icon {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+  }
+
   .books-table-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--border-medium);
   }
   .books-table {
-    min-width: 520px;
+    min-width: 480px;
+  }
+  .books-table th,
+  .books-table td {
+    padding: 8px 10px;
+    font-size: 0.75rem;
   }
 }

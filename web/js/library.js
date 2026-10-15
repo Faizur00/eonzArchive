@@ -170,7 +170,7 @@ const Library = {
       return;
     }
 
-    grid.style.display = 'grid';
+    grid.style.display = '';
     grid.innerHTML = State.folders.map(f => `
       <div class="folder-card" onclick="Router.navigate('/folder/${f.id}')" title="${escapeHtml(f.name)}">
         <span class="folder-icon">
