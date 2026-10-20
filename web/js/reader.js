@@ -742,8 +742,7 @@ const Reader = {
     if (!State.currentRendition) return;
     const pos = typeof State.currentRendition.getPosition === 'function' ? State.currentRendition.getPosition() : null;
     
-    // 1. Reading Progress Bar
-    const progressBar = document.getElementById('readingProgressBar');
+    // 1. Reading Progress Calculation
     let pct = 0;
     if (pos) {
       if (typeof pos.percentage === 'number' && !isNaN(pos.percentage)) {
@@ -752,11 +751,8 @@ const Reader = {
         pct = Math.min(100, Math.max(0, ((parseInt(pos.chapterDocIndex, 10) + 1) / this.chaptersList.length) * 100));
       }
     }
-    if (progressBar) {
-      progressBar.style.width = `${pct}%`;
-    }
 
-    // 2. Semantic Chapter Title
+    // 2. Semantic Chapter Title and Clean Typographical Progress
     const chapIndicator = document.getElementById('readerChapterIndicator');
     const mobileIndicator = document.getElementById('readerPageIndicatorMobile');
     if (pos && pos.chapterDocIndex !== undefined) {
@@ -766,12 +762,13 @@ const Reader = {
         ? chapterObj.label.trim()
         : `SECTION ${idx + 1}`;
       
+      const labelText = pct > 0 ? `${title.toUpperCase()} (${Math.round(pct)}%)` : title.toUpperCase();
       if (chapIndicator) {
-        chapIndicator.textContent = title.toUpperCase();
+        chapIndicator.textContent = labelText;
         chapIndicator.title = title;
       }
       if (mobileIndicator) {
-        mobileIndicator.textContent = title.toUpperCase();
+        mobileIndicator.textContent = labelText;
       }
     }
 

@@ -238,9 +238,6 @@ const Library = {
                   <span class="badge badge-${fmt}">${escapeHtml(r.format || 'EPUB')}</span>
                   <span class="continue-card-title">${escapeHtml(r.name)}</span>
                 </div>
-                <div class="continue-progress-wrap">
-                  <div class="continue-progress-bar" style="width: ${pct}%;"></div>
-                </div>
                 <div class="continue-meta-row">
                   <span>${pct}% COMPLETED</span>
                   <span style="font-weight:600; text-decoration:underline;">RESUME →</span>
@@ -338,11 +335,6 @@ const Library = {
                 <div class="cover-title-area">
                   <div class="cover-book-title" title="${cleanTitle}">${cleanTitle}</div>
                 </div>
-                ${hasProgress ? `
-                  <div class="book-progress-track">
-                    <div class="book-progress-fill" style="width: ${progress}%;"></div>
-                  </div>
-                ` : ''}
               </div>
               <div class="book-card-body">
                 <div class="book-meta-row">

@@ -72,16 +72,9 @@
   flex: 1;
 }
 
-/* Reading Progress Indicator */
+/* Reading Progress Indicator (Hidden to prevent dark top edge bar) */
 .reading-progress-line {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 2px;
-  background: var(--text-primary);
-  width: 0%;
-  transition: width var(--transition-fast);
-  z-index: 650;
+  display: none;
 }
 
 /* Reading Stage */
