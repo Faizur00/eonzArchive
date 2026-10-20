@@ -741,18 +741,8 @@ const Reader = {
   onPageChanged() {
     if (!State.currentRendition) return;
     const pos = typeof State.currentRendition.getPosition === 'function' ? State.currentRendition.getPosition() : null;
-    
-    // 1. Reading Progress Calculation
-    let pct = 0;
-    if (pos) {
-      if (typeof pos.percentage === 'number' && !isNaN(pos.percentage)) {
-        pct = Math.min(100, Math.max(0, pos.percentage * 100));
-      } else if (pos.chapterDocIndex !== undefined && this.chaptersList && this.chaptersList.length > 0) {
-        pct = Math.min(100, Math.max(0, ((parseInt(pos.chapterDocIndex, 10) + 1) / this.chaptersList.length) * 100));
-      }
-    }
 
-    // 2. Semantic Chapter Title and Clean Typographical Progress
+    // Semantic Chapter Title
     const chapIndicator = document.getElementById('readerChapterIndicator');
     const mobileIndicator = document.getElementById('readerPageIndicatorMobile');
     if (pos && pos.chapterDocIndex !== undefined) {
@@ -762,7 +752,7 @@ const Reader = {
         ? chapterObj.label.trim()
         : `SECTION ${idx + 1}`;
       
-      const labelText = pct > 0 ? `${title.toUpperCase()} (${Math.round(pct)}%)` : title.toUpperCase();
+      const labelText = title.toUpperCase();
       if (chapIndicator) {
         chapIndicator.textContent = labelText;
         chapIndicator.title = title;
@@ -1047,39 +1037,9 @@ const Reader = {
       const pos = State.currentRendition.getPosition();
       if (pos) {
         localStorage.setItem(`eonz.reading.${State.currentBook.fileId}`, JSON.stringify(pos));
-        this.recordRecentBook(pos);
       }
     } catch (e) {
       console.warn('Failed to save position:', e);
-    }
-  },
-
-  recordRecentBook(pos) {
-    if (!State.currentBook) return;
-    try {
-      let pct = 0;
-      if (typeof pos.percentage === 'number' && !isNaN(pos.percentage)) {
-        pct = Math.min(100, Math.max(0, pos.percentage * 100));
-      } else if (pos.chapterDocIndex !== undefined && this.chaptersList && this.chaptersList.length > 0) {
-        pct = Math.min(100, Math.max(0, ((parseInt(pos.chapterDocIndex, 10) + 1) / this.chaptersList.length) * 100));
-      }
-      const raw = localStorage.getItem('eonz.recentBooks');
-      let recent = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(recent)) recent = [];
-      
-      const fileId = State.currentBook.fileId || State.currentBook.id;
-      recent = recent.filter(r => r.id !== fileId);
-      recent.unshift({
-        id: fileId,
-        name: State.currentBook.name || 'Untitled Document',
-        format: State.currentBook.format || 'EPUB',
-        percentage: Math.round(pct),
-        updatedAt: Date.now()
-      });
-      if (recent.length > 8) recent = recent.slice(0, 8);
-      localStorage.setItem('eonz.recentBooks', JSON.stringify(recent));
-    } catch (err) {
-      console.warn('Failed to record recent book:', err);
     }
   },
 

@@ -181,75 +181,6 @@ const Library = {
     `).join('');
   },
 
-  getReadingProgress(fileId) {
-    try {
-      const raw = localStorage.getItem('eonz.recentBooks');
-      if (raw) {
-        const list = JSON.parse(raw);
-        if (Array.isArray(list)) {
-          const item = list.find(r => r.id === fileId);
-          if (item && typeof item.percentage === 'number') {
-            return item.percentage;
-          }
-        }
-      }
-      const savedPos = localStorage.getItem(`eonz.reading.${fileId}`);
-      if (savedPos) {
-        const pos = JSON.parse(savedPos);
-        if (pos && typeof pos.percentage === 'number') {
-          return Math.round(pos.percentage * 100);
-        }
-      }
-    } catch (e) {}
-    return null;
-  },
-
-  getRecentBooks() {
-    try {
-      const raw = localStorage.getItem('eonz.recentBooks');
-      if (raw) {
-        const list = JSON.parse(raw);
-        if (Array.isArray(list)) return list.slice(0, 4);
-      }
-    } catch (e) {}
-    return [];
-  },
-
-  renderContinueReading() {
-    if (State.currentFolderId || State.formatFilter !== 'ALL' || State.cachedOnly) return '';
-    const recents = this.getRecentBooks();
-    if (!recents || recents.length === 0) return '';
-
-    return `
-      <section class="continue-reading-section" aria-label="Continue Reading">
-        <div class="section-header-row">
-          <span class="section-header-title">
-            <svg class="icon icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            CONTINUE READING
-          </span>
-        </div>
-        <div class="continue-shelf-grid">
-          ${recents.map(r => {
-            const fmt = (r.format || 'EPUB').toLowerCase();
-            const pct = typeof r.percentage === 'number' ? r.percentage : 0;
-            return `
-              <div class="continue-card" onclick="Router.navigate('/read/${r.id}')" title="Resume reading ${escapeHtml(r.name)}">
-                <div class="continue-card-top">
-                  <span class="badge badge-${fmt}">${escapeHtml(r.format || 'EPUB')}</span>
-                  <span class="continue-card-title">${escapeHtml(r.name)}</span>
-                </div>
-                <div class="continue-meta-row">
-                  <span>${pct}% COMPLETED</span>
-                  <span style="font-weight:600; text-decoration:underline;">RESUME →</span>
-                </div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      </section>
-    `;
-  },
-
   renderBooks() {
     const container = document.getElementById('booksContainer');
     if (!container) return;
@@ -259,12 +190,10 @@ const Library = {
       return;
     }
 
-    const continueHtml = this.renderContinueReading();
-
     if (State.viewMode === 'list') {
-      container.innerHTML = continueHtml + this.renderTableView();
+      container.innerHTML = this.renderTableView();
     } else {
-      container.innerHTML = continueHtml + this.renderGridView();
+      container.innerHTML = this.renderGridView();
     }
     this.bindTableSortHeaders();
   },
@@ -323,14 +252,11 @@ const Library = {
         ${State.books.map((b) => {
           const fmt = (b.format || 'EPUB').toLowerCase();
           const cleanTitle = escapeHtml(b.name || 'Untitled Record');
-          const progress = this.getReadingProgress(b.id);
-          const hasProgress = progress !== null && progress > 0;
           return `
             <div class="book-card" data-book-id="${b.id}">
               <div class="book-cover">
                 <div class="cover-header">
                   <span class="badge badge-${fmt}">${b.format}</span>
-                  ${hasProgress ? `<span class="badge" style="background:var(--bg-surface-elevated); color:var(--text-primary); border-color:var(--border-control); font-size:0.625rem;">${progress}% READ</span>` : ''}
                 </div>
                 <div class="cover-title-area">
                   <div class="cover-book-title" title="${cleanTitle}">${cleanTitle}</div>
@@ -343,7 +269,7 @@ const Library = {
                 </div>
                 <div class="book-actions-row">
                   <button class="btn btn-primary btn-sm" style="flex-grow: 1;" onclick="Router.navigate('/read/${b.id}')">
-                    ${hasProgress ? 'RESUME' : 'READ'}
+                    READ
                   </button>
                   ${b.webViewLink ? `
                     <a href="${b.webViewLink}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm btn-icon" title="Open in Google Drive" aria-label="Open in Google Drive">
@@ -381,14 +307,11 @@ const Library = {
           <tbody>
             ${State.books.map(b => {
               const fmt = (b.format || 'EPUB').toLowerCase();
-              const progress = this.getReadingProgress(b.id);
-              const hasProgress = progress !== null && progress > 0;
               return `
                 <tr>
                   <td>
                     <div class="table-book-title">
                       <span>${escapeHtml(b.name)}</span>
-                      ${hasProgress ? `<span class="badge" style="margin-left:8px; font-size:0.59375rem; background:var(--bg-surface-elevated); color:var(--text-muted);">${progress}%</span>` : ''}
                     </div>
                   </td>
                   <td><span class="badge badge-${fmt}">${b.format}</span></td>
@@ -398,7 +321,7 @@ const Library = {
                   </td>
                   <td style="text-align: right;">
                     <button class="btn btn-primary btn-sm" onclick="Router.navigate('/read/${b.id}')">
-                      ${hasProgress ? 'RESUME' : 'READ'}
+                      READ
                     </button>
                     ${b.webViewLink ? `
                       <a href="${b.webViewLink}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm btn-icon" title="Open in Google Drive" aria-label="Open in Google Drive" style="margin-left: 4px;">

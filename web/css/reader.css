@@ -72,11 +72,6 @@
   flex: 1;
 }
 
-/* Reading Progress Indicator (Hidden to prevent dark top edge bar) */
-.reading-progress-line {
-  display: none;
-}
-
 /* Reading Stage */
 .reader-stage {
   flex-grow: 1;
