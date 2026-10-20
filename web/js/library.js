@@ -181,6 +181,78 @@ const Library = {
     `).join('');
   },
 
+  getReadingProgress(fileId) {
+    try {
+      const raw = localStorage.getItem('eonz.recentBooks');
+      if (raw) {
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) {
+          const item = list.find(r => r.id === fileId);
+          if (item && typeof item.percentage === 'number') {
+            return item.percentage;
+          }
+        }
+      }
+      const savedPos = localStorage.getItem(`eonz.reading.${fileId}`);
+      if (savedPos) {
+        const pos = JSON.parse(savedPos);
+        if (pos && typeof pos.percentage === 'number') {
+          return Math.round(pos.percentage * 100);
+        }
+      }
+    } catch (e) {}
+    return null;
+  },
+
+  getRecentBooks() {
+    try {
+      const raw = localStorage.getItem('eonz.recentBooks');
+      if (raw) {
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) return list.slice(0, 4);
+      }
+    } catch (e) {}
+    return [];
+  },
+
+  renderContinueReading() {
+    if (State.currentFolderId || State.formatFilter !== 'ALL' || State.cachedOnly) return '';
+    const recents = this.getRecentBooks();
+    if (!recents || recents.length === 0) return '';
+
+    return `
+      <section class="continue-reading-section" aria-label="Continue Reading">
+        <div class="section-header-row">
+          <span class="section-header-title">
+            <svg class="icon icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            CONTINUE READING
+          </span>
+        </div>
+        <div class="continue-shelf-grid">
+          ${recents.map(r => {
+            const fmt = (r.format || 'EPUB').toLowerCase();
+            const pct = typeof r.percentage === 'number' ? r.percentage : 0;
+            return `
+              <div class="continue-card" onclick="Router.navigate('/read/${r.id}')" title="Resume reading ${escapeHtml(r.name)}">
+                <div class="continue-card-top">
+                  <span class="badge badge-${fmt}">${escapeHtml(r.format || 'EPUB')}</span>
+                  <span class="continue-card-title">${escapeHtml(r.name)}</span>
+                </div>
+                <div class="continue-progress-wrap">
+                  <div class="continue-progress-bar" style="width: ${pct}%;"></div>
+                </div>
+                <div class="continue-meta-row">
+                  <span>${pct}% COMPLETED</span>
+                  <span style="font-weight:600; text-decoration:underline;">RESUME →</span>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </section>
+    `;
+  },
+
   renderBooks() {
     const container = document.getElementById('booksContainer');
     if (!container) return;
@@ -190,11 +262,14 @@ const Library = {
       return;
     }
 
+    const continueHtml = this.renderContinueReading();
+
     if (State.viewMode === 'list') {
-      this.renderTableView(container);
+      container.innerHTML = continueHtml + this.renderTableView();
     } else {
-      this.renderGridView(container);
+      container.innerHTML = continueHtml + this.renderGridView();
     }
+    this.bindTableSortHeaders();
   },
 
   /**
@@ -245,21 +320,29 @@ const Library = {
     this.loadFolder(State.currentFolderId);
   },
 
-  renderGridView(container) {
-    container.innerHTML = `
+  renderGridView() {
+    return `
       <div class="books-grid">
         ${State.books.map((b) => {
           const fmt = (b.format || 'EPUB').toLowerCase();
           const cleanTitle = escapeHtml(b.name || 'Untitled Record');
+          const progress = this.getReadingProgress(b.id);
+          const hasProgress = progress !== null && progress > 0;
           return `
             <div class="book-card" data-book-id="${b.id}">
               <div class="book-cover">
                 <div class="cover-header">
                   <span class="badge badge-${fmt}">${b.format}</span>
+                  ${hasProgress ? `<span class="badge" style="background:var(--bg-surface-elevated); color:var(--text-primary); border-color:var(--border-control); font-size:0.625rem;">${progress}% READ</span>` : ''}
                 </div>
                 <div class="cover-title-area">
                   <div class="cover-book-title" title="${cleanTitle}">${cleanTitle}</div>
                 </div>
+                ${hasProgress ? `
+                  <div class="book-progress-track">
+                    <div class="book-progress-fill" style="width: ${progress}%;"></div>
+                  </div>
+                ` : ''}
               </div>
               <div class="book-card-body">
                 <div class="book-meta-row">
@@ -268,10 +351,10 @@ const Library = {
                 </div>
                 <div class="book-actions-row">
                   <button class="btn btn-primary btn-sm" style="flex-grow: 1;" onclick="Router.navigate('/read/${b.id}')">
-                    READ
+                    ${hasProgress ? 'RESUME' : 'READ'}
                   </button>
                   ${b.webViewLink ? `
-                    <a href="${b.webViewLink}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm btn-icon" title="Open in Google Drive">
+                    <a href="${b.webViewLink}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm btn-icon" title="Open in Google Drive" aria-label="Open in Google Drive">
                       <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                     </a>
                   ` : ''}
@@ -284,27 +367,36 @@ const Library = {
     `;
   },
 
-  renderTableView(container) {
-    container.innerHTML = `
+  renderTableView() {
+    return `
       <div class="books-table-wrap">
         <table class="books-table">
           <thead>
             <tr>
-              <th>DOCUMENT TITLE</th>
+              <th class="sortable-th" data-sort="name">
+                DOCUMENT TITLE <span class="sort-icon">${State.sortBy === 'name' ? '▲' : ''}</span>
+              </th>
               <th>FORMAT</th>
-              <th>SIZE</th>
-              <th>MODIFIED</th>
+              <th class="sortable-th" data-sort="size">
+                SIZE <span class="sort-icon">${State.sortBy === 'size_desc' ? '▼' : (State.sortBy === 'size_asc' ? '▲' : '')}</span>
+              </th>
+              <th class="sortable-th" data-sort="date">
+                MODIFIED <span class="sort-icon">${State.sortBy === 'date_desc' ? '▼' : ''}</span>
+              </th>
               <th style="text-align: right;">ACTION</th>
             </tr>
           </thead>
           <tbody>
             ${State.books.map(b => {
               const fmt = (b.format || 'EPUB').toLowerCase();
+              const progress = this.getReadingProgress(b.id);
+              const hasProgress = progress !== null && progress > 0;
               return `
                 <tr>
                   <td>
                     <div class="table-book-title">
                       <span>${escapeHtml(b.name)}</span>
+                      ${hasProgress ? `<span class="badge" style="margin-left:8px; font-size:0.59375rem; background:var(--bg-surface-elevated); color:var(--text-muted);">${progress}%</span>` : ''}
                     </div>
                   </td>
                   <td><span class="badge badge-${fmt}">${b.format}</span></td>
@@ -314,10 +406,10 @@ const Library = {
                   </td>
                   <td style="text-align: right;">
                     <button class="btn btn-primary btn-sm" onclick="Router.navigate('/read/${b.id}')">
-                      READ
+                      ${hasProgress ? 'RESUME' : 'READ'}
                     </button>
                     ${b.webViewLink ? `
-                      <a href="${b.webViewLink}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm btn-icon" title="Open in Google Drive" style="margin-left: 4px;">
+                      <a href="${b.webViewLink}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm btn-icon" title="Open in Google Drive" aria-label="Open in Google Drive" style="margin-left: 4px;">
                         <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                       </a>
                     ` : ''}
@@ -329,6 +421,24 @@ const Library = {
         </table>
       </div>
     `;
+  },
+
+  bindTableSortHeaders() {
+    document.querySelectorAll('.books-table th.sortable-th').forEach(th => {
+      th.addEventListener('click', () => {
+        const sortType = th.getAttribute('data-sort');
+        if (sortType === 'name') {
+          State.sortBy = State.sortBy === 'name' ? 'date_desc' : 'name';
+        } else if (sortType === 'size') {
+          State.sortBy = State.sortBy === 'size_desc' ? 'size_asc' : 'size_desc';
+        } else if (sortType === 'date') {
+          State.sortBy = 'date_desc';
+        }
+        const sortSelect = document.getElementById('sortSelect');
+        if (sortSelect) sortSelect.value = State.sortBy;
+        this.loadFolder(State.currentFolderId, false);
+      });
+    });
   },
 
   async triggerSync() {

@@ -67,9 +67,12 @@ const Reader = {
     const readerThemeToggle = document.getElementById('readerThemeToggle');
     if (readerThemeToggle) {
       readerThemeToggle.addEventListener('click', async () => {
-        const nextTheme = State.theme === 'dark' ? 'light' : 'dark';
+        const themes = ['light', 'sepia', 'dark'];
+        const currentIdx = themes.indexOf(State.theme);
+        const nextTheme = themes[(currentIdx + 1) % themes.length] || 'dark';
         State.setTheme(nextTheme);
         this.applyReaderThemeUI();
+        if (typeof updateThemeToggleIcon === 'function') updateThemeToggleIcon();
         if (State.currentBook) {
           this.applyReadingStyles();
           await this.rebuildRendition();
@@ -96,6 +99,30 @@ const Reader = {
     if (fontDec && fontInc) {
       fontDec.addEventListener('click', () => this.adjustFontSize(-0.1));
       fontInc.addEventListener('click', () => this.adjustFontSize(0.1));
+    }
+
+    // Line height slider
+    const lineSlider = document.getElementById('lineHeightSlider');
+    if (lineSlider) {
+      lineSlider.value = State.readerLineHeight || 1.6;
+      lineSlider.addEventListener('input', (e) => {
+        State.readerLineHeight = parseFloat(e.target.value) || 1.6;
+        localStorage.setItem('eonz.spacing.line', String(State.readerLineHeight));
+        const lbl = document.getElementById('lineHeightLabel');
+        if (lbl) lbl.textContent = State.readerLineHeight.toFixed(1);
+        this.applyReadingStyles();
+      });
+    }
+
+    // Font family select
+    const fontSelect = document.getElementById('fontFamilySelect');
+    if (fontSelect) {
+      fontSelect.value = State.readerFontFamily || 'serif';
+      fontSelect.addEventListener('change', (e) => {
+        State.readerFontFamily = e.target.value;
+        localStorage.setItem('eonz.reader.font', State.readerFontFamily);
+        this.applyReadingStyles();
+      });
     }
 
     // Word & Letter spacing sliders
@@ -210,12 +237,24 @@ const Reader = {
     if (activeWidthBtn) activeWidthBtn.classList.add('active');
     
     this.updateFontSizeDisplay();
+
+    const lineSlider = document.getElementById('lineHeightSlider');
+    if (lineSlider) lineSlider.value = State.readerLineHeight || 1.6;
+    const lineLbl = document.getElementById('lineHeightLabel');
+    if (lineLbl) lineLbl.textContent = (State.readerLineHeight || 1.6).toFixed(1);
+
+    const fontSelect = document.getElementById('fontFamilySelect');
+    if (fontSelect) fontSelect.value = State.readerFontFamily || 'serif';
   },
 
   applyReaderThemeUI() {
     document.documentElement.setAttribute('data-theme', State.theme);
     const btn = document.getElementById('readerThemeToggle');
-    if (btn) btn.textContent = State.theme === 'dark' ? 'DARK MODE' : 'LIGHT MODE';
+    if (btn) {
+      if (State.theme === 'dark') btn.textContent = 'DARK CHARCOAL';
+      else if (State.theme === 'sepia') btn.textContent = 'SEPIA AMBER';
+      else btn.textContent = 'LIGHT PARCHMENT';
+    }
   },
 
   updateFontSizeDisplay() {
@@ -703,17 +742,37 @@ const Reader = {
     if (!State.currentRendition) return;
     const pos = typeof State.currentRendition.getPosition === 'function' ? State.currentRendition.getPosition() : null;
     
-    const chapIndicator = document.getElementById('readerChapterIndicator');
-    if (chapIndicator && pos) {
-      const idx = pos.chapterDocIndex !== undefined ? parseInt(pos.chapterDocIndex, 10) + 1 : 1;
-      chapIndicator.textContent = `SECTION ${idx}`;
+    // 1. Reading Progress Bar
+    const progressBar = document.getElementById('readingProgressBar');
+    let pct = 0;
+    if (pos) {
+      if (typeof pos.percentage === 'number' && !isNaN(pos.percentage)) {
+        pct = Math.min(100, Math.max(0, pos.percentage * 100));
+      } else if (pos.chapterDocIndex !== undefined && this.chaptersList && this.chaptersList.length > 0) {
+        pct = Math.min(100, Math.max(0, ((parseInt(pos.chapterDocIndex, 10) + 1) / this.chaptersList.length) * 100));
+      }
+    }
+    if (progressBar) {
+      progressBar.style.width = `${pct}%`;
     }
 
-    // Sync mobile bottom bar indicator
+    // 2. Semantic Chapter Title
+    const chapIndicator = document.getElementById('readerChapterIndicator');
     const mobileIndicator = document.getElementById('readerPageIndicatorMobile');
-    if (mobileIndicator && pos) {
-      const idx = pos.chapterDocIndex !== undefined ? parseInt(pos.chapterDocIndex, 10) + 1 : 1;
-      mobileIndicator.textContent = `SECTION ${idx}`;
+    if (pos && pos.chapterDocIndex !== undefined) {
+      const idx = parseInt(pos.chapterDocIndex, 10);
+      const chapterObj = this.chaptersList && this.chaptersList[idx];
+      const title = chapterObj && chapterObj.label && chapterObj.label.trim()
+        ? chapterObj.label.trim()
+        : `SECTION ${idx + 1}`;
+      
+      if (chapIndicator) {
+        chapIndicator.textContent = title.toUpperCase();
+        chapIndicator.title = title;
+      }
+      if (mobileIndicator) {
+        mobileIndicator.textContent = title.toUpperCase();
+      }
     }
 
     if (pos && pos.chapterDocIndex !== undefined) {
@@ -756,19 +815,32 @@ const Reader = {
     };
     const hlInk = token('--hl-ink', '#18181b');
 
+    let fontCss = "'Crimson Pro', 'EB Garamond', Georgia, serif";
+    if (State.readerFontFamily === 'sans') {
+      fontCss = "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+    } else if (State.readerFontFamily === 'mono') {
+      fontCss = "'JetBrains Mono', monospace";
+    }
+    const lineHeightVal = State.readerLineHeight || 1.6;
+
     style.textContent = `
       html, body {
         background-color: ${bg} !important;
         color: ${text} !important;
-        font-family: 'Crimson Pro', 'EB Garamond', Georgia, serif !important;
+        font-family: ${fontCss} !important;
+        line-height: ${lineHeightVal} !important;
       }
       body {
         word-spacing: ${State.readerWordSpacing}px !important;
         letter-spacing: ${State.readerLetterSpacing}px !important;
         font-size: ${Math.round(State.readerFontSize * 100)}% !important;
+        line-height: ${lineHeightVal} !important;
       }
       body p, body div, body span, body li, body a, body blockquote {
         word-spacing: inherit !important;
+        letter-spacing: inherit !important;
+        line-height: inherit !important;
+      }
         letter-spacing: inherit !important;
       }
       .kookit-note {
@@ -978,9 +1050,39 @@ const Reader = {
       const pos = State.currentRendition.getPosition();
       if (pos) {
         localStorage.setItem(`eonz.reading.${State.currentBook.fileId}`, JSON.stringify(pos));
+        this.recordRecentBook(pos);
       }
     } catch (e) {
       console.warn('Failed to save position:', e);
+    }
+  },
+
+  recordRecentBook(pos) {
+    if (!State.currentBook) return;
+    try {
+      let pct = 0;
+      if (typeof pos.percentage === 'number' && !isNaN(pos.percentage)) {
+        pct = Math.min(100, Math.max(0, pos.percentage * 100));
+      } else if (pos.chapterDocIndex !== undefined && this.chaptersList && this.chaptersList.length > 0) {
+        pct = Math.min(100, Math.max(0, ((parseInt(pos.chapterDocIndex, 10) + 1) / this.chaptersList.length) * 100));
+      }
+      const raw = localStorage.getItem('eonz.recentBooks');
+      let recent = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(recent)) recent = [];
+      
+      const fileId = State.currentBook.fileId || State.currentBook.id;
+      recent = recent.filter(r => r.id !== fileId);
+      recent.unshift({
+        id: fileId,
+        name: State.currentBook.name || 'Untitled Document',
+        format: State.currentBook.format || 'EPUB',
+        percentage: Math.round(pct),
+        updatedAt: Date.now()
+      });
+      if (recent.length > 8) recent = recent.slice(0, 8);
+      localStorage.setItem('eonz.recentBooks', JSON.stringify(recent));
+    } catch (err) {
+      console.warn('Failed to record recent book:', err);
     }
   },
 

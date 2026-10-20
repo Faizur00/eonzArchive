@@ -189,3 +189,84 @@
   --reader-border: #ded8c8;
   --reader-toolbar-bg: #f4f0e6;
 }
+
+/* ==========================================================================
+   SEPIA THEME: WARM AMBER & ARCHIVAL PARCHMENT
+   ========================================================================== */
+[data-theme="sepia"] {
+  --bg-app: #ebe1cf;
+  --bg-surface: #f5edde;
+  --bg-surface-elevated: #efe5d4;
+  --bg-surface-subtle: #e3d7c3;
+  --bg-hover: #e6dac6;
+  --bg-input: #f5edde;
+
+  --border-subtle: #d6c7af;
+  --border-medium: #c4b397;
+  --border-strong: #9e8c6e;
+  --border-focus: #5c4b34;
+  --border-control: #857255;
+
+  --text-primary: #382c1f;
+  --text-secondary: #5e4d39;
+  --text-muted: #79664f;
+  --text-inverse: #f5edde;
+
+  --brand-primary: #54412c;
+  --brand-primary-hover: #3d2d1c;
+
+  /* Destructive actions only. Never used for decoration. */
+  --danger-surface: #f4e1e1;
+  --danger-text: #8c2a30;
+  --danger-border: #dcb3b6;
+
+  /* Highlight marks over warm paper. */
+  --hl-yellow: #fde047;
+  --hl-green: #a7f3d0;
+  --hl-teal: #99f6e4;
+  --hl-blue: #bae6fd;
+  --hl-erase: #ef4444;
+  --hl-ink: #292015;
+  --swatch-border: #00000033;
+
+  /* Drawing ink. */
+  --draw-amber: #b45309;
+  --draw-emerald: #047857;
+  --draw-blue: #1d4ed8;
+  --draw-red: #b91c1c;
+  --draw-white: #f5edde;
+  --draw-white-border: #9e8c6e;
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: 0 4px 16px rgba(56, 44, 31, 0.12);
+
+  /* Muted Archival Format Badges */
+  --badge-epub-bg: #e5ede7;
+  --badge-epub-text: #345c43;
+  --badge-epub-border: #b8cfbf;
+
+  --badge-pdf-bg: #f2e7e7;
+  --badge-pdf-text: #6e3a3e;
+  --badge-pdf-border: #d4b2b6;
+
+  --badge-mobi-bg: #efe9de;
+  --badge-mobi-text: #665230;
+  --badge-mobi-border: #cfc2ac;
+
+  --badge-txt-bg: #e6ebf2;
+  --badge-txt-text: #384e68;
+  --badge-txt-border: #b8c7d9;
+
+  --badge-md-bg: #ede6f0;
+  --badge-md-text: #533e64;
+  --badge-md-border: #c8bad2;
+
+  /* Reader Surface (matches app theme) */
+  --reader-surface: #ebe1cf;
+  --reader-frame-bg: #ebe1cf;
+  --reader-text: #382c1f;
+  --reader-text-muted: #6e5b44;
+  --reader-border: #d6c7af;
+  --reader-toolbar-bg: #ebe1cf;
+}

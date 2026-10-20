@@ -26,6 +26,8 @@ const State = {
   readerFontSize: parseFloat(localStorage.getItem('eonz.spacing.font') || '1'),
   readerWordSpacing: parseFloat(localStorage.getItem('eonz.spacing.word') || '0'),
   readerLetterSpacing: parseFloat(localStorage.getItem('eonz.spacing.letter') || '0'),
+  readerLineHeight: parseFloat(localStorage.getItem('eonz.spacing.line') || '1.6'),
+  readerFontFamily: localStorage.getItem('eonz.reader.font') || 'serif',
   readerTextAlign: localStorage.getItem('eonz.reader.align') || 'left',
   pdfZoom: 1,
 

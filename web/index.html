@@ -89,7 +89,7 @@
           <span class="btn-text">SYNC</span>
         </button>
 
-        <button id="storageManagerBtn" class="btn btn-ghost btn-sm btn-icon" title="Storage Status">
+        <button id="storageManagerBtn" class="btn btn-ghost btn-sm btn-icon" title="Storage Status" aria-label="Storage Status">
           <svg class="icon icon-sm" viewBox="0 0 24 24">
             <rect width="20" height="8" x="2" y="2"/>
             <rect width="20" height="8" x="2" y="14"/>
@@ -98,14 +98,14 @@
           </svg>
         </button>
 
-        <button id="shortcutsBtn" class="btn btn-ghost btn-sm btn-icon" title="Keybindings">
+        <button id="shortcutsBtn" class="btn btn-ghost btn-sm btn-icon" title="Keybindings" aria-label="Keyboard Shortcuts">
           <svg class="icon icon-sm" viewBox="0 0 24 24">
             <rect width="18" height="12" x="3" y="6"/>
             <path d="M7 10h.01M11 10h.01M15 10h.01M7 14h.01M17 14h.01M11 14h4"/>
           </svg>
         </button>
 
-        <button id="themeToggleBtn" class="btn btn-ghost btn-sm btn-icon" title="Toggle Theme">
+        <button id="themeToggleBtn" class="btn btn-ghost btn-sm btn-icon" title="Toggle Theme" aria-label="Toggle Theme">
           <svg class="icon icon-sm" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="5"/>
             <line x1="12" y1="1" x2="12" y2="3"/>
@@ -142,10 +142,10 @@
         </select>
 
         <div class="view-mode-toggle">
-          <button id="viewGridBtn" class="view-btn active" title="Grid View">
+          <button id="viewGridBtn" class="view-btn active" title="Grid View" aria-label="Grid View">
             <svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3"/><rect width="7" height="7" x="14" y="3"/><rect width="7" height="7" x="14" y="14"/><rect width="7" height="7" x="3" y="14"/></svg>
           </button>
-          <button id="viewListBtn" class="view-btn" title="Ledger List View">
+          <button id="viewListBtn" class="view-btn" title="Ledger List View" aria-label="Ledger List View">
             <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
           </button>
         </div>
@@ -230,7 +230,7 @@
         </select>
 
         <!-- Appearance Settings Button -->
-        <button id="readerSettingsBtn" class="btn btn-secondary btn-sm btn-icon" title="Typography & Theme">
+        <button id="readerSettingsBtn" class="btn btn-secondary btn-sm btn-icon" title="Typography & Theme" aria-label="Appearance and Typography Settings">
           <svg class="icon icon-sm" viewBox="0 0 24 24">
             <polyline points="4 7 4 4 20 4 20 7"/>
             <line x1="9" y1="20" x2="15" y2="20"/>
@@ -239,7 +239,7 @@
         </button>
 
         <!-- Mobile More Tools Button -->
-        <button id="readerToolsBtn" class="btn btn-secondary btn-sm btn-icon mobile-only-btn" title="Reader Controls" onclick="Reader.toggleToolsSheet(true)">
+        <button id="readerToolsBtn" class="btn btn-secondary btn-sm btn-icon mobile-only-btn" title="Reader Controls" aria-label="Reader Controls" onclick="Reader.toggleToolsSheet(true)">
           <svg class="icon icon-sm" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="1.5"/>
             <circle cx="19" cy="12" r="1.5"/>
@@ -247,7 +247,7 @@
           </svg>
         </button>
 
-        <button id="fullscreenToggleBtn" class="btn btn-ghost btn-sm btn-icon" title="Fullscreen">
+        <button id="fullscreenToggleBtn" class="btn btn-ghost btn-sm btn-icon" title="Fullscreen" aria-label="Toggle Fullscreen">
           <svg class="icon icon-sm" viewBox="0 0 24 24">
             <path d="M8 3H5v3m14 0V3h-3m0 18h3v-3M3 16v3h3"/>
           </svg>
@@ -312,7 +312,7 @@
     <aside id="tocDrawer" class="toc-drawer">
       <div class="toc-header">
         <h3>INDEX OF SECTIONS</h3>
-        <button id="tocCloseBtn" class="btn btn-ghost btn-sm btn-icon">✕</button>
+        <button id="tocCloseBtn" class="btn btn-ghost btn-sm btn-icon" title="Close" aria-label="Close">✕</button>
       </div>
       <div class="toc-search">
         <input type="text" id="tocSearchInput" placeholder="FILTER SECTIONS...">
@@ -325,7 +325,7 @@
     <aside id="annotationsDrawer" class="annotations-drawer">
       <div class="toc-header">
         <h3>INDEX OF ANNOTATIONS</h3>
-        <button id="annotationsCloseBtn" class="btn btn-ghost btn-sm btn-icon">✕</button>
+        <button id="annotationsCloseBtn" class="btn btn-ghost btn-sm btn-icon" title="Close" aria-label="Close">✕</button>
       </div>
       <div class="annot-tabs-bar">
         <button class="annot-tab-btn active" data-tab="all">ALL</button>
@@ -378,6 +378,23 @@
         <div style="display:flex; align-items:center; gap:4px;">
           <button id="fontDecBtn" class="btn btn-secondary btn-sm" style="flex:1;">A−</button>
           <button id="fontIncBtn" class="btn btn-secondary btn-sm" style="flex:1;">A+</button>
+        </div>
+
+        <div style="margin-top:8px;">
+          <div class="settings-label" style="display:flex; justify-content:space-between;">
+            <span>LINE HEIGHT</span>
+            <span id="lineHeightLabel" style="font-family: var(--font-mono);">1.6</span>
+          </div>
+          <input type="range" id="lineHeightSlider" class="range-slider" min="1.2" max="2.4" step="0.1" value="1.6">
+        </div>
+
+        <div style="margin-top:8px;">
+          <div class="settings-label">FONT FAMILY</div>
+          <select id="fontFamilySelect" class="select-field" style="width:100%;">
+            <option value="serif">SERIF (GARAMOND)</option>
+            <option value="sans">SANS (JAKARTA)</option>
+            <option value="mono">MONO (JETBRAINS)</option>
+          </select>
         </div>
 
         <div style="margin-top:6px;">
@@ -464,7 +481,7 @@
     <div class="modal-card">
       <div class="modal-header">
         <h3 class="modal-title">ARCHIVE STORAGE STATUS</h3>
-        <button id="storageModalCloseBtn" class="btn btn-ghost btn-sm btn-icon">✕</button>
+        <button id="storageModalCloseBtn" class="btn btn-ghost btn-sm btn-icon" title="Close" aria-label="Close">✕</button>
       </div>
       <div id="storageModalBody" class="modal-body">
         <div class="spinner" style="margin:20px auto;"></div>
@@ -480,7 +497,7 @@
     <div class="modal-card">
       <div class="modal-header">
         <h3 class="modal-title">KEYBOARD SHORTCUTS</h3>
-        <button id="shortcutsModalCloseBtn" class="btn btn-ghost btn-sm btn-icon">✕</button>
+        <button id="shortcutsModalCloseBtn" class="btn btn-ghost btn-sm btn-icon" title="Close" aria-label="Close">✕</button>
       </div>
       <div class="modal-body">
         <table style="width:100%; border-collapse:collapse; font-size:12.5px; font-family: var(--font-mono);">
