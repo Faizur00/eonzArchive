@@ -54,6 +54,11 @@ const Reader = {
     if (settingsBtn && popover) {
       settingsBtn.addEventListener('click', (e) => {
         e.stopPropagation();
+        // On mobile the settings btn is hidden, but if somehow triggered route to sidebar style tab
+        if (window.innerWidth <= 768) {
+          this.toggleSidebar(true, 'style');
+          return;
+        }
         this.toggleSettingsPopover();
       });
       document.addEventListener('click', (e) => {
@@ -198,14 +203,14 @@ const Reader = {
         } else if (e.key === 'Escape') {
           if (this.isFootnoteOpen()) {
             this.closeFootnote();
+          } else if (document.getElementById('tocDrawer')?.classList.contains('open')) {
+            this.toggleSidebar(false);
           } else if (document.getElementById('readerToolsSheet')?.classList.contains('open')) {
             this.toggleToolsSheet(false);
           } else if (document.getElementById('readerSettingsPopover')?.classList.contains('open')) {
             this.toggleSettingsPopover(false);
           } else if (document.getElementById('annotationsDrawer')?.classList.contains('open')) {
             if (window.Annotations) Annotations.toggleDrawer(false);
-          } else if (document.getElementById('tocDrawer')?.classList.contains('open')) {
-            this.toggleTOC(false);
           } else if (window.Annotations && Annotations.activeTool !== 'none') {
             Annotations.setToolMode('none');
           } else {
@@ -1184,7 +1189,7 @@ const Reader = {
 
   closeReader() {
     this.closeFootnote();
-    this.toggleTOC(false);
+    this.toggleSidebar(false);
     this.toggleSettingsPopover(false);
     this.toggleToolsSheet(false);
     this.savePositionNow();
@@ -1202,7 +1207,7 @@ const Reader = {
 
   exitReaderDOM() {
     this.closeFootnote();
-    this.toggleTOC(false);
+    this.toggleSidebar(false);
     this.toggleSettingsPopover(false);
     this.toggleToolsSheet(false);
     this.savePositionNow();
@@ -1271,10 +1276,12 @@ const Reader = {
     const modeSelect = document.getElementById('readerModeSelect');
     if (modeSelect) modeSelect.value = mode;
     this.syncToolsSheetState();
+    this.updateSidebarModeUI(mode);
     if (State.currentBook) {
       await this.rebuildRendition();
     }
     this.toggleToolsSheet(false);
+    this.toggleSidebar(false);
   },
 
   updateSheetZoomLabel() {
