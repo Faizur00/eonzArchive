@@ -191,10 +191,11 @@ const Library = {
     }
 
     if (State.viewMode === 'list') {
-      this.renderTableView(container);
+      container.innerHTML = this.renderTableView();
     } else {
-      this.renderGridView(container);
+      container.innerHTML = this.renderGridView();
     }
+    this.bindTableSortHeaders();
   },
 
   /**
@@ -245,8 +246,8 @@ const Library = {
     this.loadFolder(State.currentFolderId);
   },
 
-  renderGridView(container) {
-    container.innerHTML = `
+  renderGridView() {
+    return `
       <div class="books-grid">
         ${State.books.map((b) => {
           const fmt = (b.format || 'EPUB').toLowerCase();
@@ -271,7 +272,7 @@ const Library = {
                     READ
                   </button>
                   ${b.webViewLink ? `
-                    <a href="${b.webViewLink}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm btn-icon" title="Open in Google Drive">
+                    <a href="${b.webViewLink}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm btn-icon" title="Open in Google Drive" aria-label="Open in Google Drive">
                       <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                     </a>
                   ` : ''}
@@ -284,16 +285,22 @@ const Library = {
     `;
   },
 
-  renderTableView(container) {
-    container.innerHTML = `
+  renderTableView() {
+    return `
       <div class="books-table-wrap">
         <table class="books-table">
           <thead>
             <tr>
-              <th>DOCUMENT TITLE</th>
+              <th class="sortable-th" data-sort="name">
+                DOCUMENT TITLE <span class="sort-icon">${State.sortBy === 'name' ? '▲' : ''}</span>
+              </th>
               <th>FORMAT</th>
-              <th>SIZE</th>
-              <th>MODIFIED</th>
+              <th class="sortable-th" data-sort="size">
+                SIZE <span class="sort-icon">${State.sortBy === 'size_desc' ? '▼' : (State.sortBy === 'size_asc' ? '▲' : '')}</span>
+              </th>
+              <th class="sortable-th" data-sort="date">
+                MODIFIED <span class="sort-icon">${State.sortBy === 'date_desc' ? '▼' : ''}</span>
+              </th>
               <th style="text-align: right;">ACTION</th>
             </tr>
           </thead>
@@ -317,7 +324,7 @@ const Library = {
                       READ
                     </button>
                     ${b.webViewLink ? `
-                      <a href="${b.webViewLink}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm btn-icon" title="Open in Google Drive" style="margin-left: 4px;">
+                      <a href="${b.webViewLink}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm btn-icon" title="Open in Google Drive" aria-label="Open in Google Drive" style="margin-left: 4px;">
                         <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                       </a>
                     ` : ''}
@@ -329,6 +336,24 @@ const Library = {
         </table>
       </div>
     `;
+  },
+
+  bindTableSortHeaders() {
+    document.querySelectorAll('.books-table th.sortable-th').forEach(th => {
+      th.addEventListener('click', () => {
+        const sortType = th.getAttribute('data-sort');
+        if (sortType === 'name') {
+          State.sortBy = State.sortBy === 'name' ? 'date_desc' : 'name';
+        } else if (sortType === 'size') {
+          State.sortBy = State.sortBy === 'size_desc' ? 'size_asc' : 'size_desc';
+        } else if (sortType === 'date') {
+          State.sortBy = 'date_desc';
+        }
+        const sortSelect = document.getElementById('sortSelect');
+        if (sortSelect) sortSelect.value = State.sortBy;
+        this.loadFolder(State.currentFolderId, false);
+      });
+    });
   },
 
   async triggerSync() {

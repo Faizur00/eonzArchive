@@ -246,20 +246,21 @@
   border: 1px solid var(--border-medium);
   display: flex;
   flex-direction: column;
-  transition: border-color var(--transition-fast);
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
 }
 .book-card:hover {
   border-color: var(--border-strong);
+  background: var(--bg-surface-elevated);
 }
 
-/* Archival Book Cover */
+/* Archival Book Cover - Pure Swiss Minimalist Layout */
 .book-cover {
-  height: 150px;
+  height: 154px;
   position: relative;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 14px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-surface-subtle);
 }
@@ -335,6 +336,21 @@
   letter-spacing: 0.8px;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border-medium);
+}
+
+.books-table th.sortable-th {
+  cursor: pointer;
+  user-select: none;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+.books-table th.sortable-th:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+.sort-icon {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 0.625rem;
 }
 
 .books-table td {

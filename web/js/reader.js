@@ -67,9 +67,12 @@ const Reader = {
     const readerThemeToggle = document.getElementById('readerThemeToggle');
     if (readerThemeToggle) {
       readerThemeToggle.addEventListener('click', async () => {
-        const nextTheme = State.theme === 'dark' ? 'light' : 'dark';
+        const themes = ['light', 'sepia', 'dark'];
+        const currentIdx = themes.indexOf(State.theme);
+        const nextTheme = themes[(currentIdx + 1) % themes.length] || 'dark';
         State.setTheme(nextTheme);
         this.applyReaderThemeUI();
+        if (typeof updateThemeToggleIcon === 'function') updateThemeToggleIcon();
         if (State.currentBook) {
           this.applyReadingStyles();
           await this.rebuildRendition();
@@ -96,6 +99,30 @@ const Reader = {
     if (fontDec && fontInc) {
       fontDec.addEventListener('click', () => this.adjustFontSize(-0.1));
       fontInc.addEventListener('click', () => this.adjustFontSize(0.1));
+    }
+
+    // Line height slider
+    const lineSlider = document.getElementById('lineHeightSlider');
+    if (lineSlider) {
+      lineSlider.value = State.readerLineHeight || 1.6;
+      lineSlider.addEventListener('input', (e) => {
+        State.readerLineHeight = parseFloat(e.target.value) || 1.6;
+        localStorage.setItem('eonz.spacing.line', String(State.readerLineHeight));
+        const lbl = document.getElementById('lineHeightLabel');
+        if (lbl) lbl.textContent = State.readerLineHeight.toFixed(1);
+        this.applyReadingStyles();
+      });
+    }
+
+    // Font family select
+    const fontSelect = document.getElementById('fontFamilySelect');
+    if (fontSelect) {
+      fontSelect.value = State.readerFontFamily || 'serif';
+      fontSelect.addEventListener('change', (e) => {
+        State.readerFontFamily = e.target.value;
+        localStorage.setItem('eonz.reader.font', State.readerFontFamily);
+        this.applyReadingStyles();
+      });
     }
 
     // Word & Letter spacing sliders
@@ -210,12 +237,24 @@ const Reader = {
     if (activeWidthBtn) activeWidthBtn.classList.add('active');
     
     this.updateFontSizeDisplay();
+
+    const lineSlider = document.getElementById('lineHeightSlider');
+    if (lineSlider) lineSlider.value = State.readerLineHeight || 1.6;
+    const lineLbl = document.getElementById('lineHeightLabel');
+    if (lineLbl) lineLbl.textContent = (State.readerLineHeight || 1.6).toFixed(1);
+
+    const fontSelect = document.getElementById('fontFamilySelect');
+    if (fontSelect) fontSelect.value = State.readerFontFamily || 'serif';
   },
 
   applyReaderThemeUI() {
     document.documentElement.setAttribute('data-theme', State.theme);
     const btn = document.getElementById('readerThemeToggle');
-    if (btn) btn.textContent = State.theme === 'dark' ? 'DARK MODE' : 'LIGHT MODE';
+    if (btn) {
+      if (State.theme === 'dark') btn.textContent = 'DARK CHARCOAL';
+      else if (State.theme === 'sepia') btn.textContent = 'SEPIA AMBER';
+      else btn.textContent = 'LIGHT PARCHMENT';
+    }
   },
 
   updateFontSizeDisplay() {
@@ -276,7 +315,9 @@ const Reader = {
     if (window.__kookitReady) await window.__kookitReady;
     
     document.getElementById('libraryView').style.display = 'none';
-    document.getElementById('readerView').style.display = 'flex';
+    const readerView = document.getElementById('readerView');
+    readerView.style.display = 'flex';
+    readerView.classList.remove('bars-hidden');
 
     document.getElementById('readerBookTitle').textContent = bookName;
     const formatBadge = document.getElementById('readerFormatBadge');
@@ -654,7 +695,17 @@ const Reader = {
           if (sel && !sel.isCollapsed) sel.removeAllRanges();
         } catch (err) {}
         const viewW = window.innerWidth;
-        const tapX  = e.changedTouches[0].clientX;
+        let tapX = e.changedTouches[0].clientX;
+        // Normalize coordinates if the touch event originated from inside an iframe
+        if (e.target && e.target.ownerDocument && e.target.ownerDocument.defaultView && e.target.ownerDocument.defaultView !== window) {
+          try {
+            const frameEl = e.target.ownerDocument.defaultView.frameElement;
+            if (frameEl) {
+              const rect = frameEl.getBoundingClientRect();
+              tapX += rect.left;
+            }
+          } catch (err) {}
+        }
         if (!isPageMode) {
           // In scroll mode only the center tap toggles the bars.
           if (tapX >= viewW * 0.25 && tapX <= viewW * 0.75) this.toggleReaderBars();
@@ -702,18 +753,25 @@ const Reader = {
   onPageChanged() {
     if (!State.currentRendition) return;
     const pos = typeof State.currentRendition.getPosition === 'function' ? State.currentRendition.getPosition() : null;
-    
-    const chapIndicator = document.getElementById('readerChapterIndicator');
-    if (chapIndicator && pos) {
-      const idx = pos.chapterDocIndex !== undefined ? parseInt(pos.chapterDocIndex, 10) + 1 : 1;
-      chapIndicator.textContent = `SECTION ${idx}`;
-    }
 
-    // Sync mobile bottom bar indicator
+    // Semantic Chapter Title
+    const chapIndicator = document.getElementById('readerChapterIndicator');
     const mobileIndicator = document.getElementById('readerPageIndicatorMobile');
-    if (mobileIndicator && pos) {
-      const idx = pos.chapterDocIndex !== undefined ? parseInt(pos.chapterDocIndex, 10) + 1 : 1;
-      mobileIndicator.textContent = `SECTION ${idx}`;
+    if (pos && pos.chapterDocIndex !== undefined) {
+      const idx = parseInt(pos.chapterDocIndex, 10);
+      const chapterObj = this.chaptersList && this.chaptersList[idx];
+      const title = chapterObj && chapterObj.label && chapterObj.label.trim()
+        ? chapterObj.label.trim()
+        : `SECTION ${idx + 1}`;
+      
+      const labelText = title.toUpperCase();
+      if (chapIndicator) {
+        chapIndicator.textContent = labelText;
+        chapIndicator.title = title;
+      }
+      if (mobileIndicator) {
+        mobileIndicator.textContent = labelText;
+      }
     }
 
     if (pos && pos.chapterDocIndex !== undefined) {
@@ -756,19 +814,32 @@ const Reader = {
     };
     const hlInk = token('--hl-ink', '#18181b');
 
+    let fontCss = "'Crimson Pro', 'EB Garamond', Georgia, serif";
+    if (State.readerFontFamily === 'sans') {
+      fontCss = "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+    } else if (State.readerFontFamily === 'mono') {
+      fontCss = "'JetBrains Mono', monospace";
+    }
+    const lineHeightVal = State.readerLineHeight || 1.6;
+
     style.textContent = `
       html, body {
         background-color: ${bg} !important;
         color: ${text} !important;
-        font-family: 'Crimson Pro', 'EB Garamond', Georgia, serif !important;
+        font-family: ${fontCss} !important;
+        line-height: ${lineHeightVal} !important;
       }
       body {
         word-spacing: ${State.readerWordSpacing}px !important;
         letter-spacing: ${State.readerLetterSpacing}px !important;
         font-size: ${Math.round(State.readerFontSize * 100)}% !important;
+        line-height: ${lineHeightVal} !important;
       }
       body p, body div, body span, body li, body a, body blockquote {
         word-spacing: inherit !important;
+        letter-spacing: inherit !important;
+        line-height: inherit !important;
+      }
         letter-spacing: inherit !important;
       }
       .kookit-note {
@@ -1018,6 +1089,8 @@ const Reader = {
     this.toggleSettingsPopover(false);
     this.toggleToolsSheet(false);
     this.savePositionNow();
+    const readerView = document.getElementById('readerView');
+    if (readerView) readerView.classList.remove('bars-hidden');
 
     if (window.location.hash.startsWith('#/read/')) {
       if (window.history.length > 1) {
