@@ -911,7 +911,11 @@
     user-select: none;
   }
 
+<<<<<<< HEAD
   /* Distraction-free reading auto-hide: toolbars translate away without resizing the stage */
+=======
+  /* Distraction-free reading auto-hide: toolbars translate away without collapsing flex space to preserve page layout */
+>>>>>>> bf379e8 (big fix type shi)
   #readerView.bars-hidden .reader-top-bar {
     transform: translateY(-100%);
     pointer-events: none;

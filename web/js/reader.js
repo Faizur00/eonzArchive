@@ -696,13 +696,20 @@ const Reader = {
         } catch (err) {}
         const viewW = window.innerWidth;
         let tapX = e.changedTouches[0].clientX;
+<<<<<<< HEAD
         // Normalize coordinates if the touch event originated from inside an iframe
+=======
+>>>>>>> bf379e8 (big fix type shi)
         if (e.target && e.target.ownerDocument && e.target.ownerDocument.defaultView && e.target.ownerDocument.defaultView !== window) {
           try {
             const frameEl = e.target.ownerDocument.defaultView.frameElement;
             if (frameEl) {
+<<<<<<< HEAD
               const rect = frameEl.getBoundingClientRect();
               tapX += rect.left;
+=======
+              tapX += frameEl.getBoundingClientRect().left;
+>>>>>>> bf379e8 (big fix type shi)
             }
           } catch (err) {}
         }
