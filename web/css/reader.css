@@ -983,6 +983,16 @@
     display: none;
   }
 
+  /* Suppress old bottom sheets — sidebar replaces them on mobile */
+  #readerSettingsBackdrop,
+  #readerToolsBackdrop {
+    display: none !important;
+  }
+  #readerSettingsPopover,
+  #readerToolsSheet {
+    display: none !important;
+  }
+
   /* Drawing dock positioned above bottom bar */
   .drawing-dock {
     bottom: calc(env(safe-area-inset-bottom) + 56px);
