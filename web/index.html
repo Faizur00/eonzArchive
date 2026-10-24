@@ -244,6 +244,15 @@
           </svg>
         </button>
 
+        <!-- Mobile Side Menu Button -->
+        <button id="readerSideMenuBtn" class="btn btn-secondary btn-sm btn-icon mobile-only-btn" title="Menu" aria-label="Open Reader Menu" onclick="Reader.toggleSidebar(true)">
+          <svg class="icon icon-sm" viewBox="0 0 24 24">
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+
         <button id="fullscreenToggleBtn" class="btn btn-ghost btn-sm btn-icon" title="Fullscreen" aria-label="Toggle Fullscreen">
           <svg class="icon icon-sm" viewBox="0 0 24 24">
             <path d="M8 3H5v3m14 0V3h-3m0 18h3v-3M3 16v3h3"/>
@@ -296,7 +305,7 @@
       <button class="btn btn-ghost btn-sm btn-icon" onclick="Reader.prevPage()" title="Previous Page">
         <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
-      <div class="reader-bottom-info">
+      <div class="reader-bottom-info" onclick="Reader.toggleSidebar(true, 'toc')" style="cursor: pointer;" title="Open Sections">
         <span id="readerPageIndicatorMobile" class="reader-page-indicator-mobile">SECTION 1</span>
       </div>
       <button class="btn btn-ghost btn-sm btn-icon" onclick="Reader.nextPage()" title="Next Page">
@@ -304,17 +313,124 @@
       </button>
     </nav>
 
-    <!-- Table of Contents Side Drawer -->
-    <div id="tocBackdrop" class="toc-backdrop"></div>
+    <!-- Reader Side Bar (Sections, Style, Tools) -->
+    <div id="tocBackdrop" class="toc-backdrop" onclick="Reader.toggleSidebar(false)"></div>
     <aside id="tocDrawer" class="toc-drawer">
       <div class="toc-header">
-        <h3>INDEX OF SECTIONS</h3>
-        <button id="tocCloseBtn" class="btn btn-ghost btn-sm btn-icon" title="Close" aria-label="Close">✕</button>
+        <h3 id="sidebarDrawerTitle">ARCHIVE MENU</h3>
+        <button id="tocCloseBtn" class="btn btn-ghost btn-sm btn-icon" onclick="Reader.toggleSidebar(false)" title="Close" aria-label="Close">✕</button>
       </div>
-      <div class="toc-search">
-        <input type="text" id="tocSearchInput" placeholder="FILTER SECTIONS...">
+
+      <div class="sidebar-tabs-bar">
+        <button id="sidebarTabBtnToc" class="sidebar-tab-btn active" onclick="Reader.switchSidebarTab('toc')">
+          <svg class="icon icon-xs" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          <span>SECTIONS</span>
+        </button>
+        <button id="sidebarTabBtnStyle" class="sidebar-tab-btn" onclick="Reader.switchSidebarTab('style')">
+          <svg class="icon icon-xs" viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+          <span>STYLE</span>
+        </button>
+        <button id="sidebarTabBtnTools" class="sidebar-tab-btn" onclick="Reader.switchSidebarTab('tools')">
+          <svg class="icon icon-xs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/><circle cx="5" cy="12" r="1.5"/></svg>
+          <span>TOOLS</span>
+        </button>
       </div>
-      <ul id="tocList" class="toc-list"></ul>
+
+      <!-- Tab 1: SECTIONS (Index of Chapters) -->
+      <div id="sidebarTabPaneToc" class="sidebar-tab-pane active">
+        <div class="toc-search">
+          <input type="text" id="tocSearchInput" placeholder="FILTER SECTIONS...">
+        </div>
+        <ul id="tocList" class="toc-list"></ul>
+      </div>
+
+      <!-- Tab 2: STYLE (Typography & Appearance) -->
+      <div id="sidebarTabPaneStyle" class="sidebar-tab-pane">
+        <div class="sidebar-pane-content">
+          <div class="settings-group">
+            <div class="settings-label">THEME</div>
+            <button id="sidebarThemeToggle" class="reader-theme-toggle" onclick="Reader.cycleTheme()">DARK MODE</button>
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-label" style="display:flex; justify-content:space-between;">
+              <span>TYPE SIZE</span>
+              <span id="sidebarFontSizeLabel" style="font-family: var(--font-mono);">100%</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="Reader.adjustFontSize(-0.1)">A−</button>
+              <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="Reader.adjustFontSize(0.1)">A+</button>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-label" style="display:flex; justify-content:space-between;">
+              <span>LINE HEIGHT</span>
+              <span id="sidebarLineHeightLabel" style="font-family: var(--font-mono);">1.6</span>
+            </div>
+            <input type="range" id="sidebarLineHeightSlider" class="range-slider" min="1.2" max="2.4" step="0.1" value="1.6" oninput="Reader.setLineHeight(this.value)">
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-label">FONT FAMILY</div>
+            <select id="sidebarFontFamilySelect" class="select-field" style="width:100%;" onchange="Reader.setFontFamily(this.value)">
+              <option value="serif">SERIF (GARAMOND)</option>
+              <option value="sans">SANS (JAKARTA)</option>
+              <option value="mono">MONO (JETBRAINS)</option>
+            </select>
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-label">TEXT ALIGNMENT</div>
+            <select id="sidebarTextAlignSelect" class="select-field" style="width:100%;" onchange="Reader.setTextAlign(this.value)">
+              <option value="left">LEFT</option>
+              <option value="justify">JUSTIFY</option>
+              <option value="book">BOOK DEFAULT</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 3: TOOLS (Reading Mode & Annotations) -->
+      <div id="sidebarTabPaneTools" class="sidebar-tab-pane">
+        <div class="sidebar-pane-content">
+          <div class="settings-group">
+            <div class="settings-label">PAGINATION MODE</div>
+            <div class="sheet-segment-group">
+              <button id="sidebarModeSingleBtn" class="sheet-segment-btn active" onclick="Reader.setModeFromSheet('single'); Reader.updateSidebarModeUI('single');">PAGE BY PAGE</button>
+              <button id="sidebarModeScrollBtn" class="sheet-segment-btn" onclick="Reader.setModeFromSheet('scroll'); Reader.updateSidebarModeUI('scroll');">CONTINUOUS SCROLL</button>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-label">MARKUP & ANNOTATIONS</div>
+            <div class="sheet-grid-tools">
+              <button class="sheet-action-card annot-tool-btn" data-tool="highlight" onclick="Annotations.setToolMode(Annotations.activeTool === 'highlight' ? 'none' : 'highlight'); Reader.toggleSidebar(false);">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m18 2 4 4-14 14H4v-4L18 2z"/><line x1="14.5" y1="5.5" x2="18.5" y2="9.5"/></svg>
+                <span>HIGHLIGHT</span>
+              </button>
+              <button class="sheet-action-card annot-tool-btn" data-tool="draw" onclick="Annotations.setToolMode(Annotations.activeTool === 'draw' ? 'none' : 'draw'); Reader.toggleSidebar(false);">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg>
+                <span>FREE DRAW</span>
+              </button>
+              <button class="sheet-action-card" onclick="Annotations.toggleDrawer(true); Reader.toggleSidebar(false);">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10M6 10h10M6 14h6"/></svg>
+                <span>ALL NOTES</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="sidebarPdfZoomSection" class="settings-group" style="display: none;">
+            <div class="settings-label">PDF ZOOM</div>
+            <div class="sheet-zoom-row">
+              <button class="btn btn-secondary btn-sm" onclick="Reader.zoomPdf(0.85); Reader.updateSidebarZoomLabel();">ZOOM OUT (−)</button>
+              <span id="sidebarPdfZoomLabel" style="font-family:var(--font-mono); font-size:12px; font-weight:600; padding:0 8px;">100%</span>
+              <button class="btn btn-secondary btn-sm" onclick="Reader.zoomPdf(1.15); Reader.updateSidebarZoomLabel();">ZOOM IN (+)</button>
+              <button class="btn btn-secondary btn-sm" onclick="Reader.resetPdfZoom(); Reader.updateSidebarZoomLabel();">FIT PAGE</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </aside>
 
     <!-- Annotations Side Drawer -->

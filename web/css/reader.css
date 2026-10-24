@@ -209,6 +209,64 @@
   list-style: none;
 }
 
+/* Reader Sidebar Navigation Tabs */
+.sidebar-tabs-bar {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface-subtle);
+  padding: 6px 10px;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.sidebar-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 6px;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.sidebar-tab-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+.sidebar-tab-btn.active {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border-color: var(--border-medium);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+.sidebar-tab-pane {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
+  min-height: 0;
+}
+.sidebar-tab-pane.active {
+  display: flex;
+}
+.sidebar-pane-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+#readerSideMenuBtn {
+  display: none;
+}
+
 .toc-item {
   padding: 10px 18px;
   font-family: var(--font-serif);
@@ -793,39 +851,43 @@
     display: none !important;
   }
 
-  /* 3-Zone Decluttered Reader Top Bar */
+  /* Clean Reader Top Bar on Mobile (Side Menu replaces colliding top-bar boxes) */
   .reader-top-bar {
     padding: 8px 12px;
     gap: 8px;
     min-height: 44px;
+    justify-content: space-between;
     transition: transform var(--transition-normal);
   }
   .reader-bar-left {
     gap: 8px;
     flex: 1;
     min-width: 0;
+    max-width: calc(100vw - 72px);
   }
   .reader-book-info {
     min-width: 0;
+    flex: 1;
   }
   #readerFormatBadge {
     display: none;
   }
   .reader-book-title {
-    max-width: 150px;
+    max-width: 100%;
     font-size: 0.84375rem;
     font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
+  
+  /* Hide colliding center box on mobile */
   .reader-bar-center {
-    flex: 0 0 auto;
+    display: none !important;
   }
-  #tocToggleBtn {
-    padding: 6px 10px;
-    min-height: 34px;
-    font-size: 0.6875rem;
-  }
+
   .reader-bar-right {
-    gap: 6px;
+    gap: 0;
     flex: 0 0 auto;
     justify-content: flex-end;
   }
@@ -834,16 +896,20 @@
   .reader-annotation-tools,
   #readerModeSelect,
   #pdfZoomControls,
-  #fullscreenToggleBtn {
+  #fullscreenToggleBtn,
+  #readerSettingsBtn,
+  #readerToolsBtn {
     display: none !important;
   }
 
-  #readerSettingsBtn,
-  #readerToolsBtn {
+  /* Show single Side Menu Bar Icon button */
+  #readerSideMenuBtn {
     display: inline-flex !important;
     width: 36px;
     height: 36px;
     min-width: 36px;
+    align-items: center;
+    justify-content: center;
   }
 
   /* One-handed bottom navigation bar */

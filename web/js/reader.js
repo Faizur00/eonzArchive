@@ -250,16 +250,19 @@ const Reader = {
   applyReaderThemeUI() {
     document.documentElement.setAttribute('data-theme', State.theme);
     const btn = document.getElementById('readerThemeToggle');
-    if (btn) {
-      if (State.theme === 'dark') btn.textContent = 'DARK CHARCOAL';
-      else if (State.theme === 'sepia') btn.textContent = 'SEPIA AMBER';
-      else btn.textContent = 'LIGHT PARCHMENT';
-    }
+    const sidebarBtn = document.getElementById('sidebarThemeToggle');
+    let label = 'LIGHT PARCHMENT';
+    if (State.theme === 'dark') label = 'DARK CHARCOAL';
+    else if (State.theme === 'sepia') label = 'SEPIA AMBER';
+    if (btn) btn.textContent = label;
+    if (sidebarBtn) sidebarBtn.textContent = label;
   },
 
   updateFontSizeDisplay() {
     const label = document.getElementById('fontSizeLabel');
     if (label) label.textContent = `${Math.round(State.readerFontSize * 100)}%`;
+    const sidebarLabel = document.getElementById('sidebarFontSizeLabel');
+    if (sidebarLabel) sidebarLabel.textContent = `${Math.round(State.readerFontSize * 100)}%`;
   },
 
   adjustFontSize(delta) {
@@ -936,10 +939,110 @@ const Reader = {
   },
 
   toggleTOC(open) {
+    this.toggleSidebar(open, 'toc');
+  },
+
+  toggleSidebar(open, defaultTab = 'toc') {
     const drawer = document.getElementById('tocDrawer');
     const backdrop = document.getElementById('tocBackdrop');
-    if (drawer) drawer.classList.toggle('open', open);
-    if (backdrop) backdrop.classList.toggle('open', open);
+    const shouldOpen = (open !== undefined) ? open : !drawer?.classList.contains('open');
+    if (drawer) drawer.classList.toggle('open', shouldOpen);
+    if (backdrop) backdrop.classList.toggle('open', shouldOpen);
+    if (shouldOpen) {
+      this.switchSidebarTab(defaultTab);
+      this.syncSidebarState();
+    }
+  },
+
+  switchSidebarTab(tabName) {
+    const tabs = ['toc', 'style', 'tools'];
+    tabs.forEach(t => {
+      const btn = document.getElementById(`sidebarTabBtn${t.charAt(0).toUpperCase() + t.slice(1)}`);
+      const pane = document.getElementById(`sidebarTabPane${t.charAt(0).toUpperCase() + t.slice(1)}`);
+      if (btn) btn.classList.toggle('active', t === tabName);
+      if (pane) pane.classList.toggle('active', t === tabName);
+    });
+  },
+
+  syncSidebarState() {
+    const themeBtn = document.getElementById('sidebarThemeToggle');
+    if (themeBtn) {
+      let label = 'LIGHT PARCHMENT';
+      if (State.theme === 'dark') label = 'DARK CHARCOAL';
+      else if (State.theme === 'sepia') label = 'SEPIA AMBER';
+      themeBtn.textContent = label;
+    }
+    const sizeLabel = document.getElementById('sidebarFontSizeLabel');
+    if (sizeLabel) {
+      sizeLabel.textContent = `${Math.round((State.readerFontSize || 1) * 100)}%`;
+    }
+    const lhSlider = document.getElementById('sidebarLineHeightSlider');
+    const lhLabel = document.getElementById('sidebarLineHeightLabel');
+    if (lhSlider) lhSlider.value = State.readerLineHeight || 1.6;
+    if (lhLabel) lhLabel.textContent = (State.readerLineHeight || 1.6).toFixed(1);
+    const ffSelect = document.getElementById('sidebarFontFamilySelect');
+    if (ffSelect) ffSelect.value = State.readerFontFamily || 'serif';
+    const taSelect = document.getElementById('sidebarTextAlignSelect');
+    if (taSelect) taSelect.value = State.readerTextAlign || 'left';
+    this.updateSidebarModeUI(State.readerMode || 'single');
+    const isPdf = State.currentBook && State.currentBook.format.toUpperCase() === 'PDF';
+    const zoomSec = document.getElementById('sidebarPdfZoomSection');
+    if (zoomSec) zoomSec.style.display = isPdf ? 'block' : 'none';
+    this.updateSidebarZoomLabel();
+  },
+
+  updateSidebarModeUI(mode) {
+    const singleBtn = document.getElementById('sidebarModeSingleBtn');
+    const scrollBtn = document.getElementById('sidebarModeScrollBtn');
+    if (singleBtn) singleBtn.classList.toggle('active', mode === 'single');
+    if (scrollBtn) scrollBtn.classList.toggle('active', mode === 'scroll');
+  },
+
+  updateSidebarZoomLabel() {
+    const label = document.getElementById('sidebarPdfZoomLabel');
+    if (label) label.textContent = `${Math.round((State.pdfZoom || 1) * 100)}%`;
+  },
+
+  async cycleTheme() {
+    const themes = ['light', 'sepia', 'dark'];
+    const currentIdx = themes.indexOf(State.theme);
+    const nextTheme = themes[(currentIdx + 1) % themes.length] || 'dark';
+    State.setTheme(nextTheme);
+    this.applyReaderThemeUI();
+    if (typeof updateThemeToggleIcon === 'function') updateThemeToggleIcon();
+    this.syncSidebarState();
+    if (State.currentBook) {
+      this.applyReadingStyles();
+      await this.rebuildRendition();
+    }
+  },
+
+  setLineHeight(val) {
+    State.readerLineHeight = parseFloat(val) || 1.6;
+    localStorage.setItem('eonz.spacing.line', String(State.readerLineHeight));
+    const label = document.getElementById('sidebarLineHeightLabel');
+    if (label) label.textContent = (State.readerLineHeight).toFixed(1);
+    const desktopSlider = document.getElementById('lineHeightSlider');
+    const desktopLabel = document.getElementById('lineHeightLabel');
+    if (desktopSlider) desktopSlider.value = State.readerLineHeight;
+    if (desktopLabel) desktopLabel.textContent = (State.readerLineHeight).toFixed(1);
+    this.applyReadingStyles();
+  },
+
+  setFontFamily(family) {
+    State.readerFontFamily = family;
+    localStorage.setItem('eonz.font.family', family);
+    const desktopSelect = document.getElementById('fontFamilySelect');
+    if (desktopSelect) desktopSelect.value = family;
+    this.applyReadingStyles();
+  },
+
+  setTextAlign(align) {
+    State.readerTextAlign = align;
+    localStorage.setItem('eonz.reader.textAlign', align);
+    const desktopSelect = document.getElementById('textAlignSelect');
+    if (desktopSelect) desktopSelect.value = align;
+    this.applyReadingStyles();
   },
 
   jumpToChapter(index) {
