@@ -315,7 +315,9 @@ const Reader = {
     if (window.__kookitReady) await window.__kookitReady;
     
     document.getElementById('libraryView').style.display = 'none';
-    document.getElementById('readerView').style.display = 'flex';
+    const readerView = document.getElementById('readerView');
+    readerView.style.display = 'flex';
+    readerView.classList.remove('bars-hidden');
 
     document.getElementById('readerBookTitle').textContent = bookName;
     const formatBadge = document.getElementById('readerFormatBadge');
@@ -693,7 +695,17 @@ const Reader = {
           if (sel && !sel.isCollapsed) sel.removeAllRanges();
         } catch (err) {}
         const viewW = window.innerWidth;
-        const tapX  = e.changedTouches[0].clientX;
+        let tapX = e.changedTouches[0].clientX;
+        // Normalize coordinates if the touch event originated from inside an iframe
+        if (e.target && e.target.ownerDocument && e.target.ownerDocument.defaultView && e.target.ownerDocument.defaultView !== window) {
+          try {
+            const frameEl = e.target.ownerDocument.defaultView.frameElement;
+            if (frameEl) {
+              const rect = frameEl.getBoundingClientRect();
+              tapX += rect.left;
+            }
+          } catch (err) {}
+        }
         if (!isPageMode) {
           // In scroll mode only the center tap toggles the bars.
           if (tapX >= viewW * 0.25 && tapX <= viewW * 0.75) this.toggleReaderBars();
@@ -1077,6 +1089,8 @@ const Reader = {
     this.toggleSettingsPopover(false);
     this.toggleToolsSheet(false);
     this.savePositionNow();
+    const readerView = document.getElementById('readerView');
+    if (readerView) readerView.classList.remove('bars-hidden');
 
     if (window.location.hash.startsWith('#/read/')) {
       if (window.history.length > 1) {
