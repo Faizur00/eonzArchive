@@ -56,15 +56,15 @@ function updateThemeToggleIcon() {
   const btn = document.getElementById('themeToggleBtn');
   if (!btn) return;
   if (State.theme === 'dark') {
-    btn.innerHTML = `<svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+    btn.innerHTML = `<svg aria-hidden="true" class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
     btn.setAttribute('title', 'Theme: Dark (Switch to Light)');
     btn.setAttribute('aria-label', 'Theme: Dark (Switch to Light)');
   } else if (State.theme === 'sepia') {
-    btn.innerHTML = `<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>`;
+    btn.innerHTML = `<svg aria-hidden="true" class="icon icon-sm" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>`;
     btn.setAttribute('title', 'Theme: Sepia (Switch to Dark)');
     btn.setAttribute('aria-label', 'Theme: Sepia (Switch to Dark)');
   } else {
-    btn.innerHTML = `<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+    btn.innerHTML = `<svg aria-hidden="true" class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
     btn.setAttribute('title', 'Theme: Light (Switch to Sepia)');
     btn.setAttribute('aria-label', 'Theme: Light (Switch to Sepia)');
   }
@@ -131,12 +131,12 @@ async function refreshStorageModalData() {
     body.innerHTML = `
       <div style="display:flex; flex-direction:column; gap:16px;">
         <div style="background:var(--bg-surface-subtle); padding:16px; border-radius:var(--radius); border:1px solid var(--border-subtle);">
-          <div style="font-size:0.75rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">Browser Ebook Cache</div>
-          <div style="font-size:1.25rem; font-weight:700; color:var(--text-primary); margin:4px 0 8px;">${localStats.count} cached (${localStats.totalSizeFormatted})</div>
-          <div style="font-size:0.8125rem; color:var(--text-secondary);">Stored locally in IndexedDB to skip streaming downloads on reopen. Budget: ${window.BookCache ? BookCache.formatBytes(BookCache.MAX_BUDGET_BYTES) : '250 MB'}.</div>
+          <div style="font-size:var(--text-xs); color:var(--text-muted); font-weight:600;">Browser ebook cache</div>
+          <div style="font-size:var(--text-lg); font-weight:700; color:var(--text-primary); margin:4px 0 8px;">${localStats.count} cached (${localStats.totalSizeFormatted})</div>
+          <div style="font-size:var(--text-sm); color:var(--text-secondary);">Stored locally in IndexedDB to skip streaming downloads on reopen. Budget: ${window.BookCache ? BookCache.formatBytes(BookCache.MAX_BUDGET_BYTES) : '250 MB'}.</div>
         </div>
 
-        <div style="display:flex; flex-direction:column; gap:8px; font-size:0.8125rem;">
+        <div style="display:flex; flex-direction:column; gap:8px; font-size:var(--text-sm);">
           <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border-subtle);">
             <span style="color:var(--text-muted);">Root Archive Folder</span>
             <span style="font-weight:600; color:var(--text-primary);">${status.rootFolder?.name || 'Archive'} (${status.rootFolder?.id || 'N/A'})</span>

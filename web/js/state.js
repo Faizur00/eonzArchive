@@ -53,6 +53,11 @@ const State = {
     localStorage.setItem('eonz.reader.width', preset);
     const frame = document.getElementById('readerFrame');
     if (!frame) return;
+    // A PDF page fills the reading stage. The presets belong to text.
+    if (frame.classList.contains('is-pdf')) {
+      frame.style.width = '';
+      return;
+    }
     if (window.innerWidth <= 768) {
       frame.style.width = '100vw';
       return;
