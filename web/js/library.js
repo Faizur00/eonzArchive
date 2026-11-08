@@ -91,7 +91,7 @@ const Library = {
       listContainer.innerHTML = `
         <div class="empty-state" style="border:none; padding: 40px 0;">
           <div class="spinner" style="margin: 0 auto 12px;"></div>
-          <p>RETRIEVING ARCHIVE RECORDS...</p>
+          <p>Retrieving archive records…</p>
         </div>`;
     }
 
@@ -115,7 +115,7 @@ const Library = {
       if (listContainer) {
         listContainer.innerHTML = `
           <div class="empty-state">
-            <h3>ERROR LOADING ARCHIVE</h3>
+            <h3>Error loading archive</h3>
             <p>${err.message}</p>
             <button class="btn btn-primary btn-sm" onclick="Router.navigate('/')" style="margin-top: 12px;">RETURN TO ROOT</button>
           </div>`;
@@ -172,12 +172,12 @@ const Library = {
 
     grid.style.display = '';
     grid.innerHTML = State.folders.map(f => `
-      <div class="folder-card" onclick="Router.navigate('/folder/${f.id}')" title="${escapeHtml(f.name)}">
+      <a class="folder-card" href="#/folder/${f.id}" title="${escapeHtml(f.name)}" aria-label="Open folder ${escapeHtml(f.name)}">
         <span class="folder-icon">
-          <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
+          <svg aria-hidden="true" class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
         </span>
         <span class="folder-name">${escapeHtml(f.name)}</span>
-      </div>
+      </a>
     `).join('');
   },
 
@@ -217,7 +217,7 @@ const Library = {
       }
       return `
         <div class="empty-state">
-          <h3>NO DOCUMENTS MATCH</h3>
+          <h3>No documents match</h3>
           <p>${escapeHtml(reason)}</p>
           <button class="btn btn-secondary btn-sm" style="margin-top: 12px;" onclick="Library.clearFilters()">
             SHOW ALL DOCUMENTS
@@ -227,7 +227,7 @@ const Library = {
 
     return `
       <div class="empty-state">
-        <h3>THIS FOLDER IS EMPTY</h3>
+        <h3>This folder is empty</h3>
         <p>Add documents to this folder in Google Drive, then sync to index them.</p>
         <button class="btn btn-secondary btn-sm" style="margin-top: 12px;" onclick="Library.triggerSync()">
           SYNC NOW
@@ -254,14 +254,14 @@ const Library = {
           const cleanTitle = escapeHtml(b.name || 'Untitled Record');
           return `
             <div class="book-card" data-book-id="${b.id}">
-              <div class="book-cover">
+              <a class="book-cover" href="#/read/${b.id}" aria-label="Open ${cleanTitle}">
                 <div class="cover-header">
                   <span class="badge badge-${fmt}">${b.format}</span>
                 </div>
                 <div class="cover-title-area">
                   <div class="cover-book-title" title="${cleanTitle}">${cleanTitle}</div>
                 </div>
-              </div>
+              </a>
               <div class="book-card-body">
                 <div class="book-meta-row">
                   <span>SIZE: ${b.sizeFormatted || '0 B'}</span>
@@ -273,7 +273,7 @@ const Library = {
                   </button>
                   ${b.webViewLink ? `
                     <a href="${b.webViewLink}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm btn-icon" title="Open in Google Drive" aria-label="Open in Google Drive">
-                      <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                      <svg aria-hidden="true" class="icon icon-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                     </a>
                   ` : ''}
                 </div>
@@ -291,15 +291,15 @@ const Library = {
         <table class="books-table">
           <thead>
             <tr>
-              <th class="sortable-th" data-sort="name">
-                DOCUMENT TITLE <span class="sort-icon">${State.sortBy === 'name' ? '▲' : ''}</span>
+              <th class="sortable-th" data-sort="name" tabindex="0" aria-sort="${State.sortBy === 'name' ? 'ascending' : 'none'}">
+                DOCUMENT TITLE <span class="sort-icon" aria-hidden="true">${State.sortBy === 'name' ? '▲' : ''}</span>
               </th>
               <th>FORMAT</th>
-              <th class="sortable-th" data-sort="size">
-                SIZE <span class="sort-icon">${State.sortBy === 'size_desc' ? '▼' : (State.sortBy === 'size_asc' ? '▲' : '')}</span>
+              <th class="sortable-th" data-sort="size" tabindex="0" aria-sort="${State.sortBy === 'size_desc' ? 'descending' : (State.sortBy === 'size_asc' ? 'ascending' : 'none')}">
+                SIZE <span class="sort-icon" aria-hidden="true">${State.sortBy === 'size_desc' ? '▼' : (State.sortBy === 'size_asc' ? '▲' : '')}</span>
               </th>
-              <th class="sortable-th" data-sort="date">
-                MODIFIED <span class="sort-icon">${State.sortBy === 'date_desc' ? '▼' : ''}</span>
+              <th class="sortable-th" data-sort="date" tabindex="0" aria-sort="${State.sortBy === 'date_desc' ? 'descending' : 'none'}">
+                MODIFIED <span class="sort-icon" aria-hidden="true">${State.sortBy === 'date_desc' ? '▼' : ''}</span>
               </th>
               <th style="text-align: right;">ACTION</th>
             </tr>
@@ -311,7 +311,7 @@ const Library = {
                 <tr>
                   <td>
                     <div class="table-book-title">
-                      <span>${escapeHtml(b.name)}</span>
+                      <a class="table-book-link" href="#/read/${b.id}" aria-label="Open ${escapeHtml(b.name)}">${escapeHtml(b.name)}</a>
                     </div>
                   </td>
                   <td><span class="badge badge-${fmt}">${b.format}</span></td>
@@ -325,7 +325,7 @@ const Library = {
                     </button>
                     ${b.webViewLink ? `
                       <a href="${b.webViewLink}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm btn-icon" title="Open in Google Drive" aria-label="Open in Google Drive" style="margin-left: 4px;">
-                        <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                        <svg aria-hidden="true" class="icon icon-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                       </a>
                     ` : ''}
                   </td>
@@ -339,19 +339,28 @@ const Library = {
   },
 
   bindTableSortHeaders() {
+    const activate = (th) => {
+      const sortType = th.getAttribute('data-sort');
+      if (sortType === 'name') {
+        State.sortBy = State.sortBy === 'name' ? 'date_desc' : 'name';
+      } else if (sortType === 'size') {
+        State.sortBy = State.sortBy === 'size_desc' ? 'size_asc' : 'size_desc';
+      } else if (sortType === 'date') {
+        State.sortBy = 'date_desc';
+      }
+      const sortSelect = document.getElementById('sortSelect');
+      if (sortSelect) sortSelect.value = State.sortBy;
+      this.loadFolder(State.currentFolderId, false);
+    };
+
     document.querySelectorAll('.books-table th.sortable-th').forEach(th => {
-      th.addEventListener('click', () => {
-        const sortType = th.getAttribute('data-sort');
-        if (sortType === 'name') {
-          State.sortBy = State.sortBy === 'name' ? 'date_desc' : 'name';
-        } else if (sortType === 'size') {
-          State.sortBy = State.sortBy === 'size_desc' ? 'size_asc' : 'size_desc';
-        } else if (sortType === 'date') {
-          State.sortBy = 'date_desc';
+      th.addEventListener('click', () => activate(th));
+      // A clickable header must also work from the keyboard.
+      th.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          activate(th);
         }
-        const sortSelect = document.getElementById('sortSelect');
-        if (sortSelect) sortSelect.value = State.sortBy;
-        this.loadFolder(State.currentFolderId, false);
       });
     });
   },
@@ -374,7 +383,7 @@ const Library = {
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = `<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg> SYNC`;
+        btn.innerHTML = `<svg aria-hidden="true" class="icon icon-sm" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg> SYNC`;
       }
     }
   },

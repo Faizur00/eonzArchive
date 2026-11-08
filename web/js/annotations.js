@@ -51,15 +51,15 @@ const Annotations = {
       bar.className = 'floating-selection-toolbar';
       bar.innerHTML = `
         <div class="color-palette">
-          <button class="color-swatch-btn color-0" data-color="color-0" title="Yellow Highlight"></button>
-          <button class="color-swatch-btn color-1" data-color="color-1" title="Green Highlight"></button>
-          <button class="color-swatch-btn color-2" data-color="color-2" title="Mint Highlight"></button>
-          <button class="color-swatch-btn color-3" data-color="color-3" title="Sky Highlight"></button>
-          <button class="color-swatch-btn line-0" data-color="line-0" title="Red Underline"><u>U</u></button>
+          <button class="color-swatch-btn color-0" data-color="color-0" title="Yellow Highlight" aria-label="Yellow highlight"></button>
+          <button class="color-swatch-btn color-1" data-color="color-1" title="Green Highlight" aria-label="Green highlight"></button>
+          <button class="color-swatch-btn color-2" data-color="color-2" title="Mint Highlight" aria-label="Mint highlight"></button>
+          <button class="color-swatch-btn color-3" data-color="color-3" title="Sky Highlight" aria-label="Sky highlight"></button>
+          <button class="color-swatch-btn line-0" data-color="line-0" title="Red Underline" aria-label="Red underline"><u aria-hidden="true">U</u></button>
         </div>
         <div class="toolbar-divider"></div>
-        <button id="selCopyBtn" class="sel-action-btn" title="Copy Text">
-          <svg class="icon icon-xs" viewBox="0 0 24 24"><rect width="13" height="13" x="9" y="9" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <button id="selCopyBtn" class="sel-action-btn" title="Copy Text" aria-label="Copy text">
+          <svg aria-hidden="true" class="icon icon-xs" viewBox="0 0 24 24"><rect width="13" height="13" x="9" y="9" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           <span>COPY</span>
         </button>
       `;
@@ -75,36 +75,36 @@ const Annotations = {
       dock.innerHTML = `
         <div class="dock-handle">PEN BRUSH</div>
         <div class="dock-tool-group">
-          <button id="brushModePenBtn" class="dock-btn active" title="Pen Stroke">
-            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m18 2 4 4-14 14H4v-4L18 2z"/></svg>
+          <button id="brushModePenBtn" class="dock-btn active" title="Pen Stroke" aria-label="Pen stroke" aria-pressed="true">
+            <svg aria-hidden="true" class="icon icon-sm" viewBox="0 0 24 24"><path d="m18 2 4 4-14 14H4v-4L18 2z"/></svg>
           </button>
-          <button id="brushModeEraserBtn" class="dock-btn" title="Stroke Eraser">
-            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
+          <button id="brushModeEraserBtn" class="dock-btn" title="Stroke Eraser" aria-label="Stroke eraser" aria-pressed="false">
+            <svg aria-hidden="true" class="icon icon-sm" viewBox="0 0 24 24"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
           </button>
         </div>
         <div class="dock-divider"></div>
         <div class="dock-color-palette">
-          <button class="dock-color-btn active" data-draw="amber" title="Amber"></button>
-          <button class="dock-color-btn" data-draw="emerald" title="Emerald"></button>
-          <button class="dock-color-btn" data-draw="blue" title="Blue"></button>
-          <button class="dock-color-btn" data-draw="red" title="Red"></button>
-          <button class="dock-color-btn" data-draw="white" title="White/Light"></button>
+          <button class="dock-color-btn active" data-draw="amber" title="Amber" aria-label="Amber ink"></button>
+          <button class="dock-color-btn" data-draw="emerald" title="Emerald" aria-label="Emerald ink"></button>
+          <button class="dock-color-btn" data-draw="blue" title="Blue" aria-label="Blue ink"></button>
+          <button class="dock-color-btn" data-draw="red" title="Red" aria-label="Red ink"></button>
+          <button class="dock-color-btn" data-draw="white" title="White/Light" aria-label="White ink"></button>
         </div>
         <div class="dock-divider"></div>
         <div class="dock-width-group">
-          <button class="dock-width-btn" data-width="2" title="Fine (2px)"><span style="width:3px; height:3px;"></span></button>
-          <button class="dock-width-btn active" data-width="4" title="Medium (4px)"><span style="width:6px; height:6px;"></span></button>
-          <button class="dock-width-btn" data-width="8" title="Thick (8px)"><span style="width:10px; height:10px;"></span></button>
+          <button class="dock-width-btn" data-width="2" title="Fine (2px)" aria-label="Fine stroke"><span style="width:3px; height:3px;"></span></button>
+          <button class="dock-width-btn active" data-width="4" title="Medium (4px)" aria-label="Medium stroke"><span style="width:6px; height:6px;"></span></button>
+          <button class="dock-width-btn" data-width="8" title="Thick (8px)" aria-label="Thick stroke"><span style="width:10px; height:10px;"></span></button>
         </div>
         <div class="dock-divider"></div>
         <div class="dock-actions">
-          <button id="drawingUndoBtn" class="dock-btn btn-icon" title="Undo Stroke">
-            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+          <button id="drawingUndoBtn" class="dock-btn btn-icon" title="Undo Stroke" aria-label="Undo stroke">
+            <svg aria-hidden="true" class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
           </button>
-          <button id="drawingClearBtn" class="dock-btn btn-icon" title="Clear Page Drawings">
-            <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          <button id="drawingClearBtn" class="dock-btn btn-icon" title="Clear Page Drawings" aria-label="Clear page drawings">
+            <svg aria-hidden="true" class="icon icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
           </button>
-          <button id="drawingDoneBtn" class="btn btn-secondary btn-sm" style="font-size:0.6875rem; padding:3px 8px;">DONE</button>
+          <button id="drawingDoneBtn" class="btn btn-secondary btn-sm" style="font-size:var(--text-xs); padding:3px 8px;">DONE</button>
         </div>
       `;
       document.body.appendChild(dock);
@@ -275,7 +275,12 @@ const Annotations = {
     
     // Update toolbar button active states
     document.querySelectorAll('.annot-tool-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.getAttribute('data-tool') === mode);
+      const isActive = btn.getAttribute('data-tool') === mode;
+      btn.classList.toggle('active', isActive);
+      // These are toggle buttons, so the state must be announced.
+      if (btn.hasAttribute('aria-pressed')) {
+        btn.setAttribute('aria-pressed', String(isActive));
+      }
     });
 
     const drawingDock = document.getElementById('drawingDock');
@@ -952,9 +957,9 @@ const Annotations = {
     if (filtered.length === 0) {
       listEl.innerHTML = `
         <div class="empty-annotations-placeholder">
-          <svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-          <div style="font-size:0.8125rem; font-weight:600; margin-top:8px;">NO ANNOTATIONS FOUND</div>
-          <div style="font-size:0.6875rem; color:var(--text-muted); margin-top:4px;">Highlight text or draw on pages to index them here.</div>
+          <svg aria-hidden="true" class="icon icon-lg" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <div style="font-size:var(--text-sm); font-weight:600; margin-top:8px;">No annotations found</div>
+          <div style="font-size:var(--text-xs); color:var(--text-muted); margin-top:4px;">Highlight text or draw on pages to index them here.</div>
         </div>
       `;
       return;
@@ -991,11 +996,11 @@ const Annotations = {
           </div>
           <div class="annot-item-body">${bodyText}</div>
           <div class="annot-item-actions" onclick="event.stopPropagation();">
-            <button class="btn btn-ghost btn-xs btn-icon" onclick="Annotations.jumpToAnnotation('${item.id}', ${item.chapterDocIndex})" title="Jump to location">
-              <svg class="icon icon-xs" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+            <button class="btn btn-ghost btn-xs btn-icon" onclick="Annotations.jumpToAnnotation('${item.id}', ${item.chapterDocIndex})" title="Jump to location" aria-label="Jump to annotation">
+              <svg aria-hidden="true" class="icon icon-xs" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
-            <button class="btn btn-ghost btn-xs btn-icon text-danger" onclick="Annotations.deleteAnnotation('${item.id}')" title="Delete">
-              <svg class="icon icon-xs" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <button class="btn btn-ghost btn-xs btn-icon text-danger" onclick="Annotations.deleteAnnotation('${item.id}')" title="Delete" aria-label="Delete annotation">
+              <svg aria-hidden="true" class="icon icon-xs" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
         </div>

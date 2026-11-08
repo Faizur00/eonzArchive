@@ -25,6 +25,8 @@ const Reader = {
       modeSelect.addEventListener('change', async (e) => {
         State.readerMode = e.target.value;
         localStorage.setItem('eonz.reader.mode', State.readerMode);
+        // The TOOLS tab reports the value of this control.
+        this.updateSidebarModeUI(State.readerMode);
         if (State.currentBook) {
           await this.rebuildRendition();
         }
@@ -175,17 +177,46 @@ const Reader = {
     // Mobile tap zones & swipe navigation
     this.bindMobileTouchNav();
 
-    // Window resize handler for automatic reflow
-    let resizeTimer = null;
-    window.addEventListener('resize', () => {
-      const readerView = document.getElementById('readerView');
-      if (readerView && readerView.style.display !== 'none' && State.currentBook && !State.isBuildingRendition) {
+    // Automatic reflow. Measure the reading stage, not the window:
+    // the column changes only when the space around it changes.
+    const stage = document.querySelector('.reader-stage');
+    if (stage && typeof ResizeObserver === 'function') {
+      // Use the border box: a scrollbar must not look like a new column width.
+      const measure = () => {
+        const rect = stage.getBoundingClientRect();
+        return { width: Math.round(rect.width), height: Math.round(rect.height) };
+      };
+      let stageSize = measure();
+      let resizeTimer = null;
+      this._stageObserver = new ResizeObserver(() => {
+        const size = measure();
+        if (size.width === stageSize.width && size.height === stageSize.height) return;
+        stageSize = size;
+
+        const readerView = document.getElementById('readerView');
+        if (!readerView || readerView.style.display === 'none') return;
+        if (!State.currentBook || State.isBuildingRendition) return;
+        // A zoomed page is scaled by a transform. Refitting would cancel the zoom.
+        if (document.getElementById('readerFrame')?.classList.contains('is-zoomed')) return;
+
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(() => {
           this.rebuildRendition();
         }, 250);
-      }
-    });
+      });
+      this._stageObserver.observe(stage);
+    } else {
+      let resizeTimer = null;
+      window.addEventListener('resize', () => {
+        const readerView = document.getElementById('readerView');
+        if (readerView && readerView.style.display !== 'none' && State.currentBook && !State.isBuildingRendition) {
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(() => {
+            this.rebuildRendition();
+          }, 250);
+        }
+      });
+    }
 
     // Global Keybindings for Reader
     window.addEventListener('keydown', (e) => {
@@ -334,18 +365,18 @@ const Reader = {
 
     // Toggle PDF / reflowable controls
     const isPdf = format.toUpperCase() === 'PDF';
-    const pdfControls = document.getElementById('pdfZoomControls');
     const spacingControls = document.getElementById('spacingControlsGroup');
-    if (pdfControls) pdfControls.style.display = isPdf ? 'inline-flex' : 'none';
     if (spacingControls) spacingControls.style.display = isPdf ? 'none' : 'flex';
 
     State.pdfZoom = 1;
+    this.applyPdfFrame(isPdf);
     this.updatePdfZoomLabel();
+    this.updateSidebarModeUI(State.readerMode || 'single');
 
     const pageArea = document.getElementById('page-area');
     if (pageArea) pageArea.innerHTML = '';
 
-    this.showLoading('RETRIEVING DOCUMENT...', 'Loading document structure...');
+    this.showLoading('Opening document', 'Loading document structure...');
 
     try {
       const meta = metadata || (State.books && State.books.find(b => b.id === fileId)) || null;
@@ -355,7 +386,7 @@ const Reader = {
 
       // 1. Attempt cache lookup if BookCache and a valid fingerprint exist
       if (window.BookCache && fingerprint) {
-        this.showLoading('RETRIEVING DOCUMENT...', 'Checking local cache...');
+        this.showLoading('Opening document', 'Checking local cache...');
         try {
           const cached = await BookCache.get(fileId, fingerprint);
           if (cached && cached.buffer) {
@@ -370,7 +401,7 @@ const Reader = {
 
       // 2. Fetch from network on cache miss or invalid/missing entry
       if (!buffer) {
-        this.showLoading('RETRIEVING DOCUMENT...', 'Streaming document from Google Drive...');
+        this.showLoading('Opening document', 'Streaming document from Google Drive...');
         const startTime = Date.now();
         const headers = {};
         if (window.__API_TOKEN) {
@@ -430,8 +461,11 @@ const Reader = {
     if (!State.currentBook) return;
     const { fileId, format, buffer } = State.currentBook;
 
+    // The page must fit its container before the renderer measures it.
+    this.applyPdfFrame();
+
     State.isBuildingRendition = true;
-    this.showLoading('INITIALIZING RENDERING ENGINE...', `Configuring typography for ${format}...`);
+    this.showLoading('Preparing the renderer', `Configuring typography for ${format}...`);
 
     try {
       if (!window.Kookit) {
@@ -528,6 +562,7 @@ const Reader = {
         rendition.on('rendered', (chapterDocIndex) => {
           this.applyReadingStyles();
           this.attachIframeInterceptors(rendition);
+          this.onPageChanged();
           if (window.Annotations) {
             const activeChapter = chapterDocIndex !== undefined && chapterDocIndex !== null
               ? (parseInt(chapterDocIndex, 10) || 0)
@@ -547,6 +582,7 @@ const Reader = {
       this.savePositionNow();
       this.applyReadingStyles();
       this.attachIframeInterceptors(rendition);
+      this.onPageChanged();
       if (window.Annotations) Annotations.renderAllForCurrentPage();
     } finally {
       State.isBuildingRendition = false;
@@ -754,6 +790,113 @@ const Reader = {
     }
   },
 
+  getCurrentChapterTitle(pos) {
+    if (!pos && State.currentRendition && typeof State.currentRendition.getPosition === 'function') {
+      pos = State.currentRendition.getPosition();
+    }
+    if (!pos && State.currentRendition && State.currentRendition.tempLocation) {
+      pos = State.currentRendition.tempLocation;
+    }
+    if (!pos) return null;
+
+    const rendition = State.currentRendition;
+    const rawDocIndex = pos.chapterDocIndex !== undefined ? parseInt(pos.chapterDocIndex, 10) : null;
+    const flatList = this._flattenedChapters && this._flattenedChapters.length > 0
+      ? this._flattenedChapters
+      : (this.chaptersList && this.chaptersList.length > 0 ? this.flattenChapters(this.chaptersList) : []);
+
+    // 1. Direct chapterTitle from position if non-empty and meaningful
+    if (pos.chapterTitle && typeof pos.chapterTitle === 'string') {
+      const trimmed = pos.chapterTitle.trim();
+      if (trimmed && !/^(prevchapter|nextchapter)$/i.test(trimmed)) {
+        return trimmed;
+      }
+    }
+
+    // 2. Match by exact or base chapterHref in flattened TOC
+    const targetHref = (pos.chapterHref || pos.href || '').trim();
+    if (targetHref && flatList.length > 0) {
+      const exactHrefMatch = flatList.find(c => c.href && c.href.trim() === targetHref);
+      if (exactHrefMatch && exactHrefMatch.label && exactHrefMatch.label.trim()) {
+        return exactHrefMatch.label.trim();
+      }
+      const baseTargetHref = targetHref.split('#')[0].replace(/^\.\//, '');
+      if (baseTargetHref) {
+        const baseHrefMatch = flatList.find(c => {
+          if (!c.href) return false;
+          const base = c.href.trim().split('#')[0].replace(/^\.\//, '');
+          return base === baseTargetHref;
+        });
+        if (baseHrefMatch && baseHrefMatch.label && baseHrefMatch.label.trim()) {
+          return baseHrefMatch.label.trim();
+        }
+      }
+    }
+
+    // 3. Match by chapterDocIndex in flattened TOC
+    if (rawDocIndex !== null && !isNaN(rawDocIndex) && flatList.length > 0) {
+      // 3a. Exact index match
+      const exactIndexMatch = flatList.find(c => c.index !== undefined && parseInt(c.index, 10) === rawDocIndex);
+      if (exactIndexMatch && exactIndexMatch.label && exactIndexMatch.label.trim()) {
+        return exactIndexMatch.label.trim();
+      }
+
+      // 3b. Best prior chapter match (closest chapter whose index <= current doc index)
+      const candidates = flatList.filter(c => c.index !== undefined && parseInt(c.index, 10) <= rawDocIndex);
+      if (candidates.length > 0) {
+        candidates.sort((a, b) => parseInt(b.index, 10) - parseInt(a.index, 10));
+        if (candidates[0].label && candidates[0].label.trim()) {
+          return candidates[0].label.trim();
+        }
+      }
+    }
+
+    // 4. Check rendition.chapterDocList for current document or prior labeled doc
+    if (rawDocIndex !== null && !isNaN(rawDocIndex) && rendition && rendition.chapterDocList) {
+      for (let i = rawDocIndex; i >= 0; i--) {
+        const entry = rendition.chapterDocList[i];
+        if (entry && entry.label && entry.label.trim()) {
+          return entry.label.trim();
+        }
+      }
+    }
+
+    // 5. Query active DOM heading in the current document (e.g. <h1> or <h2> or .chapter-title)
+    if (rendition && typeof rendition.getDocument === 'function') {
+      try {
+        const doc = rendition.getDocument();
+        if (doc) {
+          const heading = doc.querySelector('h1, h2, .chapter-title, .chaptertitle, [class*="chapter-title"], [class*="chapterTitle"]');
+          if (heading && heading.textContent && heading.textContent.trim()) {
+            const hText = heading.textContent.trim().replace(/\s+/g, ' ');
+            if (hText.length > 0 && hText.length <= 100) {
+              return hText;
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 6. Direct array access fallback if index is in range
+    if (rawDocIndex !== null && !isNaN(rawDocIndex) && this.chaptersList && this.chaptersList[rawDocIndex]) {
+      const ch = this.chaptersList[rawDocIndex];
+      if (ch && ch.label && ch.label.trim()) {
+        return ch.label.trim();
+      }
+    }
+
+    // 7. Format-aware fallback
+    const isPdf = State.currentBook && State.currentBook.format.toUpperCase() === 'PDF';
+    if (isPdf && rawDocIndex !== null) {
+      return `Page ${rawDocIndex + 1}`;
+    }
+    if (rawDocIndex !== null) {
+      return `Section ${rawDocIndex + 1}`;
+    }
+
+    return null;
+  },
+
   onPageChanged() {
     if (!State.currentRendition) return;
     const pos = typeof State.currentRendition.getPosition === 'function' ? State.currentRendition.getPosition() : null;
@@ -761,27 +904,23 @@ const Reader = {
     // Semantic Chapter Title
     const chapIndicator = document.getElementById('readerChapterIndicator');
     const mobileIndicator = document.getElementById('readerPageIndicatorMobile');
-    if (pos && pos.chapterDocIndex !== undefined) {
-      const idx = parseInt(pos.chapterDocIndex, 10);
-      const chapterObj = this.chaptersList && this.chaptersList[idx];
-      const title = chapterObj && chapterObj.label && chapterObj.label.trim()
-        ? chapterObj.label.trim()
-        : `SECTION ${idx + 1}`;
-      
-      const labelText = title.toUpperCase();
+    const title = this.getCurrentChapterTitle(pos);
+    if (title) {
       if (chapIndicator) {
-        chapIndicator.textContent = labelText;
+        chapIndicator.textContent = title;
         chapIndicator.title = title;
       }
       if (mobileIndicator) {
-        mobileIndicator.textContent = labelText;
+        mobileIndicator.textContent = title;
+        mobileIndicator.title = title;
       }
     }
 
     if (pos && pos.chapterDocIndex !== undefined) {
+      const curIdx = parseInt(pos.chapterDocIndex, 10);
       document.querySelectorAll('.toc-item').forEach(el => {
         const cIndex = parseInt(el.getAttribute('data-chapter-index'), 10);
-        el.classList.toggle('active', cIndex === parseInt(pos.chapterDocIndex, 10));
+        el.classList.toggle('active', cIndex === curIdx);
       });
       if (window.Annotations) {
         Annotations.onPageChanged(pos.chapterDocIndex);
@@ -897,10 +1036,27 @@ const Reader = {
     `;
   },
 
+  flattenChapters(chapters) {
+    if (!Array.isArray(chapters)) return [];
+    const flat = [];
+    const recurse = (items, depth = 0) => {
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (!item) continue;
+        flat.push({ ...item, depth });
+        if (Array.isArray(item.subitems) && item.subitems.length > 0) {
+          recurse(item.subitems, depth + 1);
+        }
+      }
+    };
+    recurse(chapters);
+    return flat;
+  },
+
   async populateTOC(rendition) {
     const listEl = document.getElementById('tocList');
     if (!listEl) return;
-    listEl.innerHTML = '<li style="padding: 14px 18px; color: var(--text-muted); font-size:0.8125rem;">INDEXING CHAPTERS...</li>';
+    listEl.innerHTML = '<li style="padding: 14px 18px; color: var(--text-muted); font-size:var(--text-sm);">Indexing chapters…</li>';
 
     try {
       let chapters = [];
@@ -911,9 +1067,12 @@ const Reader = {
       }
 
       this.chaptersList = chapters || [];
-      this.renderTOCList(this.chaptersList);
+      this._flattenedChapters = this.flattenChapters(this.chaptersList);
+      this.renderTOCList(this._flattenedChapters.length > 0 ? this._flattenedChapters : this.chaptersList);
+      // Immediately reflect the resolved chapter title in the semantic header
+      this.onPageChanged();
     } catch (err) {
-      listEl.innerHTML = '<li style="padding: 14px 18px; color: var(--text-muted); font-size:0.8125rem;">NO INDEX AVAILABLE.</li>';
+      listEl.innerHTML = '<li style="padding: 14px 18px; color: var(--text-muted); font-size:var(--text-sm);">No index available.</li>';
     }
   },
 
@@ -922,24 +1081,32 @@ const Reader = {
     if (!listEl) return;
 
     if (!chapters || chapters.length === 0) {
-      listEl.innerHTML = '<li style="padding: 14px 18px; color: var(--text-muted); font-size:0.8125rem;">NO CHAPTERS FOUND.</li>';
+      listEl.innerHTML = '<li style="padding: 14px 18px; color: var(--text-muted); font-size:var(--text-sm);">No chapters found.</li>';
       return;
     }
 
-    listEl.innerHTML = chapters.map((ch, idx) => `
-      <li class="toc-item" data-chapter-index="${ch.index !== undefined ? ch.index : idx}" onclick="Reader.jumpToChapter(${ch.index !== undefined ? ch.index : idx})">
-        <span>${escapeHtml(ch.label || `Section ${idx + 1}`)}</span>
-        <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
-      </li>
-    `).join('');
+    listEl.innerHTML = chapters.map((ch, idx) => {
+      const paddingLeft = 18 + (ch.depth || 0) * 14;
+      const targetIndex = ch.index !== undefined ? ch.index : idx;
+      return `
+        <li class="toc-item" style="padding-left: ${paddingLeft}px;" data-chapter-index="${targetIndex}" onclick="Reader.jumpToChapter(${targetIndex})">
+          <span>${escapeHtml(ch.label || `Section ${idx + 1}`)}</span>
+          <svg aria-hidden="true" class="icon icon-sm" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+        </li>
+      `;
+    }).join('');
   },
 
   filterTOC(query) {
+    const source = (this._flattenedChapters && this._flattenedChapters.length > 0)
+      ? this._flattenedChapters
+      : this.chaptersList;
     if (!query) {
-      this.renderTOCList(this.chaptersList);
+      this.renderTOCList(source);
       return;
     }
-    const filtered = this.chaptersList.filter(c => (c.label || '').toLowerCase().includes(query));
+    const q = query.toLowerCase();
+    const filtered = source.filter(c => (c.label || '').toLowerCase().includes(q));
     this.renderTOCList(filtered);
   },
 
@@ -953,6 +1120,13 @@ const Reader = {
     const shouldOpen = (open !== undefined) ? open : !drawer?.classList.contains('open');
     if (drawer) drawer.classList.toggle('open', shouldOpen);
     if (backdrop) backdrop.classList.toggle('open', shouldOpen);
+
+    // Both the section button and the mobile menu button open this drawer.
+    ['tocToggleBtn', 'readerSideMenuBtn'].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (btn) btn.setAttribute('aria-expanded', String(shouldOpen));
+    });
+
     if (shouldOpen) {
       this.switchSidebarTab(defaultTab);
       this.syncSidebarState();
@@ -997,15 +1171,16 @@ const Reader = {
   },
 
   updateSidebarModeUI(mode) {
-    const singleBtn = document.getElementById('sidebarModeSingleBtn');
-    const scrollBtn = document.getElementById('sidebarModeScrollBtn');
-    if (singleBtn) singleBtn.classList.toggle('active', mode === 'single');
-    if (scrollBtn) scrollBtn.classList.toggle('active', mode === 'scroll');
+    const value = document.getElementById('sidebarModeValue');
+    if (value) {
+      value.textContent = mode === 'scroll'
+        ? 'Continuous scroll'
+        : (mode === 'double' ? 'Two-page spread' : 'Page by page');
+    }
   },
 
   updateSidebarZoomLabel() {
-    const label = document.getElementById('sidebarPdfZoomLabel');
-    if (label) label.textContent = `${Math.round((State.pdfZoom || 1) * 100)}%`;
+    this.updatePdfZoomLabel();
   },
 
   async cycleTheme() {
@@ -1053,8 +1228,18 @@ const Reader = {
   jumpToChapter(index) {
     this.closeFootnote();
     this.toggleTOC(false);
-    if (State.currentRendition && typeof State.currentRendition.goToChapter === 'function') {
-      State.currentRendition.goToChapter(parseInt(index, 10));
+    if (State.currentRendition) {
+      const idx = parseInt(index, 10);
+      const ch = (this._flattenedChapters || []).find(c => parseInt(c.index, 10) === idx) ||
+                 (this.chaptersList && this.chaptersList[idx]);
+      if (typeof State.currentRendition.goToChapter === 'function') {
+        if (ch && ch.href) {
+          State.currentRendition.goToChapter(idx, ch.href, ch.label);
+        } else {
+          State.currentRendition.goToChapter(idx);
+        }
+      }
+      setTimeout(() => this.onPageChanged(), 50);
     }
   },
 
@@ -1072,34 +1257,59 @@ const Reader = {
     }
   },
 
-  updatePdfZoomLabel() {
-    const label = document.getElementById('pdfZoomLabel');
-    if (label) label.textContent = `${Math.round(State.pdfZoom * 100)}%`;
-  },
-
-  async zoomPdf(factor) {
-    if (!State.currentBook || State.currentBook.format !== 'PDF') return;
-    State.pdfZoom = Math.min(3, Math.max(0.5, State.pdfZoom * factor));
-    this.updatePdfZoomLabel();
-
+  /**
+   * Mark the frame for a PDF page and for the current zoom level.
+   * A PDF page must fit the stage, so the width presets do not apply.
+   */
+  applyPdfFrame(isPdfOverride) {
     const frame = document.getElementById('readerFrame');
-    if (frame) {
-      frame.style.width = `${65 * State.pdfZoom}vw`;
-      frame.style.height = `${100 * State.pdfZoom}%`;
+    if (!frame) return;
+
+    const isPdf = (isPdfOverride !== undefined)
+      ? !!isPdfOverride
+      : !!(State.currentBook && State.currentBook.format.toUpperCase() === 'PDF');
+    const zoom = isPdf ? (State.pdfZoom || 1) : 1;
+    const isZoomed = isPdf && zoom > 1.001;
+
+    frame.classList.toggle('is-pdf', isPdf);
+    frame.classList.toggle('is-zoomed', isZoomed);
+
+    if (isPdf) {
+      // The page fills the frame. Clear any width set by a preset.
+      frame.style.setProperty('--pdf-zoom', String(zoom));
+      frame.style.width = '';
+      frame.style.height = '';
+    } else {
+      frame.style.removeProperty('--pdf-zoom');
+      State.setReaderWidth(State.readerWidth);
     }
-    await this.rebuildRendition();
+
+    // A zoomed page is larger than the stage, so the stage must pan.
+    const stage = document.querySelector('.reader-stage');
+    if (stage) stage.classList.toggle('is-panning', isZoomed);
   },
 
-  async resetPdfZoom() {
-    if (!State.currentBook || State.currentBook.format !== 'PDF') return;
+  updatePdfZoomLabel() {
+    const text = `${Math.round((State.pdfZoom || 1) * 100)}%`;
+    ['pdfZoomLabel', 'sidebarPdfZoomLabel', 'sheetPdfZoomLabel'].forEach((id) => {
+      const label = document.getElementById(id);
+      if (label) label.textContent = text;
+    });
+  },
+
+  zoomPdf(factor) {
+    if (!State.currentBook || State.currentBook.format.toUpperCase() !== 'PDF') return;
+    State.pdfZoom = Math.min(3, Math.max(0.5, (State.pdfZoom || 1) * factor));
+    this.updatePdfZoomLabel();
+    // Scale the rendered page. Do not rebuild: a rebuild would refit the page.
+    this.applyPdfFrame(true);
+  },
+
+  resetPdfZoom() {
+    if (!State.currentBook || State.currentBook.format.toUpperCase() !== 'PDF') return;
     State.pdfZoom = 1;
     this.updatePdfZoomLabel();
-    const frame = document.getElementById('readerFrame');
-    if (frame) {
-      frame.style.width = '65vw';
-      frame.style.height = '100%';
-    }
-    await this.rebuildRendition();
+    this.applyPdfFrame(true);
   },
 
   showFootnote(html, iframe, evt) {
@@ -1212,6 +1422,17 @@ const Reader = {
     this.toggleToolsSheet(false);
     this.savePositionNow();
 
+    // Drop the PDF page state so the next book starts from a fitted frame.
+    State.pdfZoom = 1;
+    const frame = document.getElementById('readerFrame');
+    if (frame) {
+      frame.classList.remove('is-pdf', 'is-zoomed');
+      frame.style.removeProperty('--pdf-zoom');
+    }
+    const stage = document.querySelector('.reader-stage');
+    if (stage) stage.classList.remove('is-panning');
+    State.setReaderWidth(State.readerWidth);
+
     if (window.Annotations) {
       Annotations.setToolMode('none');
       Annotations.toggleDrawer(false);
@@ -1225,6 +1446,19 @@ const Reader = {
     if (pageArea) pageArea.innerHTML = '';
     State.currentRendition = null;
     State.currentBook = null;
+
+    this.chaptersList = [];
+    this._flattenedChapters = [];
+    const chapIndicator = document.getElementById('readerChapterIndicator');
+    if (chapIndicator) {
+      chapIndicator.textContent = 'SECTIONS';
+      chapIndicator.removeAttribute('title');
+    }
+    const mobileIndicator = document.getElementById('readerPageIndicatorMobile');
+    if (mobileIndicator) {
+      mobileIndicator.textContent = 'SECTION 1';
+      mobileIndicator.removeAttribute('title');
+    }
   },
 
   toggleSettingsPopover(open) {
@@ -1285,11 +1519,7 @@ const Reader = {
   },
 
   updateSheetZoomLabel() {
-    const label = document.getElementById('sheetPdfZoomLabel');
-    const desktopLabel = document.getElementById('pdfZoomLabel');
-    if (label && desktopLabel) {
-      label.textContent = desktopLabel.textContent;
-    }
+    this.updatePdfZoomLabel();
   }
 };
 
